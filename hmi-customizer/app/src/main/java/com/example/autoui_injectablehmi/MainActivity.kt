@@ -38,8 +38,9 @@ class MainActivity : ComponentActivity() {
         // 1. Initialize the ViewModel
         val viewModel = ViewModelProvider(this)[DashboardViewModel::class.java]
 
+        val brokerUrl = getString(R.string.default_mqtt_broker)
         lifecycleScope.launch(Dispatchers.IO) {
-            MQTTManager.connect()
+            MQTTManager.connect(brokerUrl)
 
             // 2. Pass the ViewModel into the Notification Service
             NotificationService.initialise(viewModel)

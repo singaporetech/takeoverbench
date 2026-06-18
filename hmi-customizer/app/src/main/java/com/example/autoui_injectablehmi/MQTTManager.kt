@@ -4,22 +4,18 @@ import org.eclipse.paho.client.mqttv3.*
 
 object MQTTManager {
 
-    private const val BROKER =
-        "tcp://10.200.33.205" +
-                ":1883"
-
-    private val client = MqttClient(
-        BROKER,
-        "AndroidTablet_${System.currentTimeMillis()}",
-        null
-    )
+    private lateinit var clientId: String
+    private var client: MqttClient? = null
 
     private val listeners =
         mutableMapOf<String, MutableList<(String) -> Unit>>()
 
-    fun connect() {
+    fun connect(brokerUrl: String = "tcp://localhost:1883") {
         try {
-            if (client.isConnected) return
+            if (client?.isConnected == true) return
+
+            clientId = "AndroidTablet_${System.currentTimeMillis()}"
+            client = MqttClient(brokerUrl, clientId, null)
 
             val options = MqttConnectOptions().apply {
                 isAutomaticReconnect = true
@@ -27,7 +23,7 @@ object MQTTManager {
                 connectionTimeout = 10
             }
 
-            client.setCallback(
+            client?.setCallback(
                 object : MqttCallback {
 
                     override fun connectionLost(cause: Throwable?) {
@@ -53,7 +49,7 @@ object MQTTManager {
                 }
             )
 
-            client.connect(options)
+            client?.connect(options)
 
         } catch (e: Exception) {
             e.printStackTrace()
@@ -65,13 +61,14 @@ object MQTTManager {
         callback: (String) -> Unit
     ) {
 
-        if (!client.isConnected) return
+        val c = client ?: return
+        if (!c.isConnected) return
 
         listeners.getOrPut(topic) {
             mutableListOf()
         }.add(callback)
 
-        client.subscribe(topic)
+        c.subscribe(topic)
     }
 
     fun publish(
@@ -79,9 +76,10 @@ object MQTTManager {
         message: String
     ) {
 
-        if (!client.isConnected) return
+        val c = client ?: return
+        if (!c.isConnected) return
 
-        client.publish(
+        c.publish(
             topic,
             MqttMessage(
                 message.toByteArray()

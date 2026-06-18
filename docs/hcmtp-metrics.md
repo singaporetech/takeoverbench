@@ -1,10 +1,6 @@
 # HCMTP Metric Mapping — TakeoverBench
 
-## Reference
-Li et al. (2023). A human-centered comprehensive measure of take-over performance based on multiple objective metrics. *IEEE Transactions on Intelligent Transportation Systems*.
-
-## Fidelity Scoring Reference
-Wynne, R. A., Beanland, V., & Salmon, P. M. (2019). Systematic review of driving simulator validation studies. *Ergonomics*, 62(10), 1255–1271.
+This document describes how TakeoverBench implements the **Human-Centred Comprehensive Measure of Take-Over Performance** (HCMTP) framework to evaluate driver takeover performance in conditionally automated driving scenarios. The system records 41 objective telemetry metrics during each takeover event and reduces them to 9 principal performance components via sparse PCA. This document serves as the reference for how every metric is defined, computed, standardised, and mapped to the final component scores — ensuring consistent, reproducible evaluation of takeover performance across all experimental runs.
 
 ---
 
@@ -12,55 +8,55 @@ Wynne, R. A., Beanland, V., & Salmon, P. M. (2019). Systematic review of driving
 
 | # | Metric | Unit | Definition | Status | Confidence | Notes |
 |---|--------|------|------------|--------|------------|-------|
-| 1 | RTS | s | Time from TOR until steer > 2° | Computed | ✅ Exact | 🔧 Computable (convert steer 0-1 → degrees, CARLA steer ×450°) |
-| 2 | RTB | s | Time from TOR until brake > 10% | Computed | ✅ Exact | |
-| 3 | RTA | s | Time from TOR until throttle > 5% | Computed | ✅ Exact | |
-| 4 | RT | s | min(RTS, RTB, RTA) | Computed | ✅ Exact | |
-| 5 | TTBT | s | Time to lane boundary at TOR onset (t=0 snapshot) | Computed | ⚠️ Approx | Instantaneous. distance_to_edge / lateral_velocity at t=0. Differs from TLC which tracks continuously. |
-| 6 | SAmax | ° | Max steering wheel angle | Computed | ⚠️ Approx | 🔧 Compute from steer normalized × 450° |
-| 7 | SAmean | ° | Mean steering wheel angle | Computed | ⚠️ Approx | 🔧 Compute from steer normalized × 450° |
-| 8 | SASD | ° | SD of steering wheel angle | Computed | ⚠️ Approx | 🔧 Compute from steer normalized × 450° |
-| 9 | Bmax | MPa | Max brake pressure | Computed | ⚠️ Approx | |
-| 10 | Bmean | MPa | Mean brake pressure | Computed | ⚠️ Approx | |
-| 11 | BSD | MPa | SD of brake pressure | Computed | ⚠️ Approx | |
-| 12 | Thmax | % | Max throttle position | Computed | ✅ Exact | |
-| 13 | Thmean | % | Mean throttle position | Computed | ✅ Exact | |
-| 14 | ThSD | % | SD of throttle position | Computed | ✅ Exact | |
-| 15 | LaAmax | m/s² | Max lateral acceleration | Computed | ✅ Exact | |
-| 16 | LaAmean | m/s² | Mean lateral acceleration | Computed | ✅ Exact | |
-| 17 | LaASD | m/s² | SD of lateral acceleration | Computed | ✅ Exact | |
-| 18 | YRmax | °/s | Max yaw rate | Computed | ✅ Exact | |
-| 19 | YRmean | °/s | Mean yaw rate | Computed | ✅ Exact | |
-| 20 | YRSD | °/s | SD of yaw rate | Computed | ✅ Exact | |
-| 21 | Ymax | ° | Max yaw angle | Computed | ✅ Exact | |
-| 22 | Ymean | ° | Mean yaw angle | Computed | ✅ Exact | |
-| 23 | YSD | ° | SD of yaw angle | Computed | ✅ Exact | |
-| 24 | LaVmax | m/s | Max lateral velocity | Computed | ✅ Exact | |
-| 25 | LaVmean | m/s | Mean lateral velocity | Computed | ✅ Exact | |
-| 26 | LaVSD | m/s | SD of lateral velocity | Computed | ✅ Exact | |
-| 27 | YAmax | °/s² | Max yaw acceleration | Computed | ✅ Exact | |
-| 28 | YAmean | °/s² | Mean yaw acceleration | Computed | ✅ Exact | |
-| 29 | YASD | °/s² | SD of yaw acceleration | Computed | ✅ Exact | |
-| 30 | LoAmax | m/s² | Max longitudinal acceleration | Computed | ✅ Exact | |
-| 31 | LoAmean | m/s² | Mean longitudinal acceleration | Computed | ✅ Exact | |
-| 32 | LoASD | m/s² | SD of longitudinal acceleration | Computed | ✅ Exact | |
-| 33 | MRLD | m | Min relative distance to other vehicles | Computed | ✅ Exact | |
-| 34 | HFCS | — | High-freq steering content ratio | Deferred | ❌ Deferred | |
-| 35 | TTC | s | Min time to collision | Computed | ✅ Exact | |
-| 36 | DTC | m | Min distance to collision | Computed | ✅ Exact | |
-| 37 | TLC | s | Min time to lane crossing (dynamic, post-TOR t>0) | Computed | ✅ Exact | Dynamic: distance_to_edge / lateral_velocity tracked continuously. |
-| 38 | TCLC | s | Time to complete a lane change | Deferred | ❌ Deferred | Needs lane-change start/end detection (lane_id transitions). |
-| 39 | ECLmax | m | Max lateral offset from lane center (post-TOR) | Computed | ✅ Exact | Waypoint-based: max \|vehicle_pos - waypoint_center\|. |
-| 40 | ECLmean | m | Mean lateral offset from lane center (post-TOR) | Computed | ✅ Exact | Waypoint-based: mean \|vehicle_pos - waypoint_center\|. |
-| 41 | SDLP | m | SD of lateral position (post-TOR) | Computed | ✅ Exact | Waypoint-based: std \|vehicle_pos - waypoint_center\|. |
+| 1 | RTS | s | Time from TOR until steer > 2° | Computed | Exact |  Computable (convert steer 0-1 → degrees, CARLA steer ×450°) |
+| 2 | RTB | s | Time from TOR until brake > 10% | Computed | Exact | |
+| 3 | RTA | s | Time from TOR until throttle > 5% | Computed | Exact | |
+| 4 | RT | s | min(RTS, RTB, RTA) | Computed | Exact | |
+| 5 | TTBT | s | Time to lane boundary at TOR onset (t=0 snapshot) | Computed | Approx | Instantaneous. distance_to_edge / lateral_velocity at t=0. Differs from TLC which tracks continuously. |
+| 6 | SAmax | ° | Max steering wheel angle | Computed | Approx |  Compute from steer normalized × 450° |
+| 7 | SAmean | ° | Mean steering wheel angle | Computed | Approx |  Compute from steer normalized × 450° |
+| 8 | SASD | ° | SD of steering wheel angle | Computed | Approx |  Compute from steer normalized × 450° |
+| 9 | Bmax | MPa | Max brake pressure | Computed | Approx | |
+| 10 | Bmean | MPa | Mean brake pressure | Computed | Approx | |
+| 11 | BSD | MPa | SD of brake pressure | Computed | Approx | |
+| 12 | Thmax | % | Max throttle position | Computed | Exact | |
+| 13 | Thmean | % | Mean throttle position | Computed | Exact | |
+| 14 | ThSD | % | SD of throttle position | Computed | Exact | |
+| 15 | LaAmax | m/s² | Max lateral acceleration | Computed | Exact | |
+| 16 | LaAmean | m/s² | Mean lateral acceleration | Computed | Exact | |
+| 17 | LaASD | m/s² | SD of lateral acceleration | Computed | Exact | |
+| 18 | YRmax | °/s | Max yaw rate | Computed | Exact | |
+| 19 | YRmean | °/s | Mean yaw rate | Computed | Exact | |
+| 20 | YRSD | °/s | SD of yaw rate | Computed | Exact | |
+| 21 | Ymax | ° | Max yaw angle | Computed | Exact | |
+| 22 | Ymean | ° | Mean yaw angle | Computed | Exact | |
+| 23 | YSD | ° | SD of yaw angle | Computed | Exact | |
+| 24 | LaVmax | m/s | Max lateral velocity | Computed | Exact | |
+| 25 | LaVmean | m/s | Mean lateral velocity | Computed | Exact | |
+| 26 | LaVSD | m/s | SD of lateral velocity | Computed | Exact | |
+| 27 | YAmax | °/s² | Max yaw acceleration | Computed | Exact | |
+| 28 | YAmean | °/s² | Mean yaw acceleration | Computed | Exact | |
+| 29 | YASD | °/s² | SD of yaw acceleration | Computed | Exact | |
+| 30 | LoAmax | m/s² | Max longitudinal acceleration | Computed | Exact | |
+| 31 | LoAmean | m/s² | Mean longitudinal acceleration | Computed | Exact | |
+| 32 | LoASD | m/s² | SD of longitudinal acceleration | Computed | Exact | |
+| 33 | MRLD | m | Min relative distance to other vehicles | Computed | Exact | |
+| 34 | HFCS | — | High-freq steering content ratio | Deferred | Deferred | |
+| 35 | TTC | s | Min time to collision | Computed | Exact | |
+| 36 | DTC | m | Min distance to collision | Computed | Exact | |
+| 37 | TLC | s | Min time to lane crossing (dynamic, post-TOR t>0) | Computed | Exact | Dynamic: distance_to_edge / lateral_velocity tracked continuously. |
+| 38 | TCLC | s | Time to complete a lane change | Deferred | Deferred | Needs lane-change start/end detection (lane_id transitions). |
+| 39 | ECLmax | m | Max lateral offset from lane center (post-TOR) | Computed | Exact | Waypoint-based: max \|vehicle_pos - waypoint_center\|. |
+| 40 | ECLmean | m | Mean lateral offset from lane center (post-TOR) | Computed | Exact | Waypoint-based: mean \|vehicle_pos - waypoint_center\|. |
+| 41 | SDLP | m | SD of lateral position (post-TOR) | Computed | Exact | Waypoint-based: std \|vehicle_pos - waypoint_center\|. |
 
 ## Confidence Levels
 
 | Level | Count | Meaning |
 |---|---|---|
-| ✅ Exact | 32 | Same metric, same unit, same methodology as the paper. |
-| ⚠️ Approx | 7 | Same metric and unit, but conversion factors are assumed (not hardware-calibrated) or use CARLA approximations. See implementation notes below. |
-| ❌ Deferred | 2 | Metric not implemented (HFCS, TCLC). Planned for future. |
+| Exact | 32 | Same metric, same unit, same methodology as the paper. |
+| Approx | 7 | Same metric and unit, but conversion factors are assumed (not hardware-calibrated) or use CARLA approximations. See implementation notes below. |
+| Deferred | 2 | Metric not implemented (HFCS, TCLC). Planned for future. |
 | **Total** | **41** | |
 
 ### Approximation Notes
@@ -76,7 +72,7 @@ Wynne, R. A., Beanland, V., & Salmon, P. M. (2019). Systematic review of driving
 
 **Impact**: PC3 (Distance Security) has reduced accuracy because TCLC is not yet implemented. Once lane-change detection is added, PC3 will be complete. ECLmax/ECLmean/SDLP are now computed via waypoints.
 
-> **Table III naming note:** The paper's Table III uses "YR" as a typographical truncation of $YR_{max}$ (yaw rate max). Our code keys this as `YRmax`.
+**Note:** The paper's Table III uses "YR" as a typographical truncation of $YR_{max}$ (yaw rate max). Our code keys this as `YRmax`.
 
 ## PCA Loading Weights
 
@@ -240,8 +236,6 @@ The final HCMTP 0–10 unified score requires:
 2. **GAM mapping functions** (Generalized Additive Models): trained via Bayesian stepwise regression (Equation 11 in Li et al. 2023) to map the 9 PC scores to the STOPA ratings for each individual driver.
 3. **Relabeling algorithm**: cross-references all drivers' GAM models to produce a ground-truth unified score per take-over.
 
----
-
 ## Interpreting PC Scores
 
 ### The Direction of Each PC
@@ -250,15 +244,15 @@ Each PC score is a standardized value. The direction (positive vs negative) depe
 
 | PC | Name | Positive (+) means... | Negative (-) means... |
 |-----|------|----------------------|----------------------|
-| PC1 | Lateral Control | ✅ Smooth, minimal corrections | ❌ Erratic steering, high yaw variance |
-| PC2 | Longitudinal Brake | ✅ Light, controlled braking | ❌ Hard, heavy braking (panic) |
-| PC3 | Distance Security | ✅ Safe, large TTC/DTC margins | ❌ Close to collision, small margins |
-| PC4 | Longitudinal Throttle | ❌ Heavy or jerky throttle application | ✅ Smooth, light throttle |
-| PC5 | Reaction Time | ✅ Fast reaction | ❌ Slow reaction |
-| PC6 | Lateral Fine Control | ❌ Jerky yaw/lateral movements (high variance) | ✅ Smooth, stable |
-| PC7 | Lateral Composite | ❌ Large steering amplitude | ✅ Small, smooth corrections |
-| PC8 | Lane Keeping | ❌ Wandering, high lane center error | ✅ Centered in lane |
-| PC9 | Lateral Velocity | ✅ Stable lateral position | ❌ Fast side-to-side movement (swerving) |
+| PC1 | Lateral Control | Smooth, minimal corrections | Erratic steering, high yaw variance |
+| PC2 | Longitudinal Brake | Light, controlled braking | Hard, heavy braking (panic) |
+| PC3 | Distance Security | Safe, large TTC/DTC margins | Close to collision, small margins |
+| PC4 | Longitudinal Throttle | Heavy or jerky throttle application | Smooth, light throttle |
+| PC5 | Reaction Time | Fast reaction | Slow reaction |
+| PC6 | Lateral Fine Control | Jerky yaw/lateral movements (high variance) | Smooth, stable |
+| PC7 | Lateral Composite | Large steering amplitude | Small, smooth corrections |
+| PC8 | Lane Keeping | Wandering, high lane center error | Centered in lane |
+| PC9 | Lateral Velocity | Stable lateral position | Fast side-to-side movement (swerving) |
 
 ### What a "Good Takeover" Looks Like
 

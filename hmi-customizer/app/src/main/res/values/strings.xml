@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">autoui_injectablehmi</string>
+    <string name="default_mqtt_broker">tcp://10.200.33.205:1883</string>
 </resources>
