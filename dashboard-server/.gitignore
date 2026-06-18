@@ -1,0 +1,11 @@
+/__pycache__
+.agents/
+.skills/
+.opencode/
+/runs/
+.env
+rsync-dev.sh
+sim/__pycache__/
+docs/agent-sessions/
+*.pyc
+!.skills/custom-team-rules.md

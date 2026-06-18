@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TakeoverBench — Research Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+</head>
+<body>
+
+<!-- ════════════════════════════════════ -->
+<!-- TOPBAR — 4 solid color badges      -->
+<!-- ════════════════════════════════════ -->
+<div class="topbar">
+  <div class="logo">TAKEOVER<span>BENCH</span><span class="logo-tag">SAE J3016-2021</span></div>
+  <div class="topbar-right">
+    <span class="badge badge-blue"  id="lbl-participant">ID: --</span>
+    <span class="badge badge-green" id="lbl-carla">CARLA DISCONNECTED</span>
+    <span class="badge badge-green" id="lbl-hmi">HMI OFFLINE</span>
+    <span class="autopilot-badge idle" id="autopilot-badge">⏸ IDLE</span>
+    <a class="badge badge-red" href="/setup" id="setup-link">EXIT</a>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════ -->
+<!-- LAYOUT — 2 columns                 -->
+<!-- ════════════════════════════════════ -->
+<div class="layout">
+
+  <!-- ── LEFT: Floating cards ── -->
+  <div class="panel-left">
+
+    <!-- CARD 1: Scenario Sets + Queue -->
+    <div class="dash-card">
+      <div class="dash-card-title">Scenario Sets</div>
+      <div class="sets-list" id="sets-list">
+        <div class="queue-empty">No sets available</div>
+      </div>
+      <div class="active-set-header" id="active-set-header" style="display:none;">
+        <span class="active-set-label">Active Set</span>
+        <span class="active-set-name" id="active-set-name-display">--</span>
+      </div>
+      <div class="section-subtitle">
+        Run Queue
+        <span id="queue-count" class="queue-count-pill"></span>
+      </div>
+      <div class="queue-timeline" id="queue-list">
+        <div class="queue-empty" id="queue-empty">No scenarios queued</div>
+      </div>
+    </div>
+
+    <!-- CARD 2: Run Controls -->
+    <div class="dash-card">
+      <div class="dash-card-title">Run Controls</div>
+      <div class="run-id-box">
+        <span class="run-id-label">ACTIVE RUN</span>
+        <span class="run-id-value" id="run-id-display">--</span>
+      </div>
+      <button class="btn btn-start" id="btn-start" onclick="startScenario()">Start Scenario</button>
+      <button class="btn btn-report" id="btn-pdf" onclick="downloadReport()" disabled
+              title="Available after at least one scenario run completes">Session Report</button>
+    </div>
+
+    <!-- CARD 3: Active Scenario -->
+    <div class="dash-card">
+      <div class="dash-card-title">Active Scenario</div>
+      <div class="scenario-detail-box" id="active-scenario-info">No scenario loaded.</div>
+    </div>
+
+  </div>
+
+  <!-- ── RIGHT: Video ── -->
+  <div class="panel-video">
+    <div class="video-container">
+      <div class="video-no-feed" id="no-feed">
+        <div class="no-feed-icon">▶</div>
+        <div>AWAITING SIMULATION FEED</div>
+        <div class="subtitle-sm">Start a scenario to begin</div>
+      </div>
+      <img id="video-feed" src="" alt="" style="display:none;">
+      <div class="video-overlay">
+        <div class="video-corner tl"></div><div class="video-corner tr"></div>
+        <div class="video-corner bl"></div><div class="video-corner br"></div>
+        <div class="countdown-pill" id="lbl-countdown"></div>
+        <div class="video-hud">
+          <span class="hud-badge" id="hud-ttc">TTC --</span>
+          <span class="hud-badge" id="hud-speed">SPD --</span>
+          <span class="hud-badge" id="hud-steer">STR --</span>
+          <span class="hud-badge" id="hud-ap">IDLE</span>
+        </div>
+        <div class="tor-banner" id="tor-banner">TOR TRIGGERED</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end layout -->
+
+<!-- Hidden stubs for core.js compatibility (elements removed from visual UI) -->
+<div style="display:none">
+  <span id="dot-carla"></span>
+  <span id="dot-rec"></span>
+  <span id="lbl-rec"></span>
+  <span id="lbl-runid"></span>
+  <div id="next-card" class="next-card">
+    <div id="next-card-name"></div>
+    <div id="next-card-meta"></div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='dashboard-ui.js') }}"></script>
+<script src="{{ url_for('static', filename='dashboard-core.js') }}"></script>
+<script>
+  document.getElementById('setup-link').addEventListener('click', function(e) {
+    if (typeof isRunning !== 'undefined' && isRunning) {
+      if (!confirm('A scenario is currently running. Navigating to Setup will not stop it, but you will lose the live dashboard view.\n\nContinue?')) {
+        e.preventDefault();
+      }
+    }
+  });
+</script>
+</body>
+</html>

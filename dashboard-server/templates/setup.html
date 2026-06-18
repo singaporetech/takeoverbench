@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TakeoverBench — Hardware Setup</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='setup.css') }}">
+</head>
+<body>
+
+<!-- Top Nav -->
+<div class="top-nav">
+  <div class="logo">TAKEOVER<span>BENCH</span></div>
+</div>
+
+<!-- Page Header -->
+<div class="page-header">
+  <h1>Hardware Configuration</h1>
+  <p>Configure your simulator setup before running experiments</p>
+</div>
+
+<!-- Progress Stepper -->
+<div class="stepper">
+  <div class="step-item active">
+    <div class="step-circle">1</div>
+    <span class="step-label">Setup</span>
+  </div>
+  <div class="step-line"></div>
+  <div class="step-item">
+    <div class="step-circle">2</div>
+    <span class="step-label">Fidelity Checklist</span>
+  </div>
+  <div class="step-line"></div>
+  <div class="step-item">
+    <div class="step-circle">3</div>
+    <span class="step-label">Fidelity Score</span>
+  </div>
+</div>
+
+<!-- Main Card -->
+<div class="main-card">
+
+  <!-- ════════════════════════════════════════ -->
+  <!-- STEP 1: SETUP (Connections & ID)       -->
+  <!-- ════════════════════════════════════════ -->
+  <div class="step-content" id="step-1">
+
+    <!-- Participant -->
+    <div class="setup-row">
+      <div class="row-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b5bdb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+      </div>
+      <div class="row-text">
+        <div class="row-title">PARTICIPANT</div>
+        <div class="row-desc">Enter a unique identifier for this session</div>
+      </div>
+      <div class="row-control">
+        <input class="field-input" type="text" id="participant-id" placeholder="e.g. P001" maxlength="20" autocomplete="off">
+      </div>
+    </div>
+
+    <!-- CARLA Connection -->
+    <div class="setup-row">
+      <div class="row-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b5bdb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+          <line x1="8" y1="21" x2="16" y2="21"/>
+          <line x1="12" y1="17" x2="12" y2="21"/>
+        </svg>
+      </div>
+      <div class="row-text">
+        <div class="row-title">CARLA CONNECTION</div>
+        <div class="row-desc">Connect to the CARLA simulation server</div>
+      </div>
+      <div class="row-control">
+        <div class="conn-inline">
+          <span class="conn-status" id="carla-status-setup"></span>
+          <button class="btn-connect" id="btn-carla-setup" onclick="connectCarlaSetup()">Connect</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- HMI Connection -->
+    <div class="setup-row">
+      <div class="row-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b5bdb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+        </svg>
+      </div>
+      <div class="row-text">
+        <div class="row-title">HMI CONNECTION</div>
+        <div class="row-desc">Test the Human-Machine Interface connection</div>
+      </div>
+      <div class="row-control">
+        <div class="conn-inline">
+          <span class="conn-status" id="hmi-status-setup"></span>
+          <button class="btn-connect" id="btn-hmi-setup" onclick="testHMISetup()">Connect</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-footer">
+      <div></div>
+      <button class="btn-next" id="btn-step1-next" disabled>Next →</button>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════ -->
+  <!-- STEP 2: FIDELITY CHECKLIST             -->
+  <!-- ════════════════════════════════════════ -->
+  <div class="step-content" id="step-2" style="display:none">
+
+    <!-- ── Visual Display ── -->
+    <div class="checklist-row">
+      <div class="checklist-info">
+        <div class="checklist-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3b5bdb" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+            <line x1="8" y1="21" x2="16" y2="21"/>
+            <line x1="12" y1="17" x2="12" y2="21"/>
+          </svg>
+        </div>
+        <div class="checklist-cat-title">Visual Display</div>
+        <div class="checklist-cat-desc">Select your display configuration</div>
+        <div class="checklist-warnings" id="warnings-visual"></div>
+      </div>
+      <div class="checklist-options">
+        <label class="radio-pill selected" data-group="visual" data-val="single_screen" data-score="1">
+          <input type="radio" name="visual" checked>
+          <span class="radio-dot"></span>
+          <span class="radio-text">Single PC Screen</span>
+          <span class="radio-score">Score 1/5</span>
+        </label>
+        <label class="radio-pill" data-group="visual" data-val="large_single" data-score="2">
+          <input type="radio" name="visual">
+          <span class="radio-dot"></span>
+          <span class="radio-text">Single Projector / Screen (&gt;25")</span>
+          <span class="radio-score">Score 2/5</span>
+        </label>
+        <label class="radio-pill" data-group="visual" data-val="multi_screen_180" data-score="3">
+          <input type="radio" name="visual">
+          <span class="radio-dot"></span>
+          <span class="radio-text">Multi-Screen (&lt;180° FOV)</span>
+          <span class="radio-score">Score 3/5</span>
+        </label>
+        <label class="radio-pill" data-group="visual" data-val="multi_screen_270" data-score="4">
+          <input type="radio" name="visual">
+          <span class="radio-dot"></span>
+          <span class="radio-text">Multi-Screen (180°–270° FOV)</span>
+          <span class="radio-score">Score 4/5</span>
+        </label>
+        <label class="radio-pill" data-group="visual" data-val="projector_270" data-score="5">
+          <input type="radio" name="visual">
+          <span class="radio-dot"></span>
+          <span class="radio-text">Projector Screens (&gt;270° FOV)</span>
+          <span class="radio-score">Score 5/5</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="checklist-divider"></div>
+
+    <!-- ── Motion System ── -->
+    <div class="checklist-row">
+      <div class="checklist-info">
+        <div class="checklist-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3b5bdb" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/>
+          </svg>
+        </div>
+        <div class="checklist-cat-title">Motion System</div>
+        <div class="checklist-cat-desc">Select your motion platform configuration</div>
+        <div class="checklist-warnings" id="warnings-motion"></div>
+      </div>
+      <div class="checklist-options">
+        <label class="radio-pill selected" data-group="motion" data-val="none" data-score="1">
+          <input type="radio" name="motion" checked>
+          <span class="radio-dot"></span>
+          <span class="radio-text">No Motion Base</span>
+          <span class="radio-score">Score 1/5</span>
+        </label>
+        <label class="radio-pill" data-group="motion" data-val="partial" data-score="3">
+          <input type="radio" name="motion">
+          <span class="radio-dot"></span>
+          <span class="radio-text">Partial Motion / Vibration Platform (&lt;6 DOF)</span>
+          <span class="radio-score">Score 3/5</span>
+        </label>
+        <label class="radio-pill" data-group="motion" data-val="full_6dof" data-score="5">
+          <input type="radio" name="motion">
+          <span class="radio-dot"></span>
+          <span class="radio-text">Full 6-DOF Motion Platform</span>
+          <span class="radio-score">Score 5/5</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="checklist-divider"></div>
+
+    <!-- ── Physical Controls ── -->
+    <div class="checklist-row">
+      <div class="checklist-info">
+        <div class="checklist-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#3b5bdb" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        </div>
+        <div class="checklist-cat-title">Physical Controls</div>
+        <div class="checklist-cat-desc">Select your physical input hardware</div>
+        <div class="checklist-warnings" id="warnings-physical"></div>
+      </div>
+      <div class="checklist-options">
+        <label class="radio-pill" data-group="physical" data-val="keyboard" data-score="1">
+          <input type="radio" name="physical">
+          <span class="radio-dot"></span>
+          <span class="radio-text">Keyboard or Joystick</span>
+          <span class="radio-score">Score 1/5</span>
+        </label>
+        <label class="radio-pill" data-group="physical" data-val="wheel_only" data-score="2">
+          <input type="radio" name="physical">
+          <span class="radio-dot"></span>
+          <span class="radio-text">Steering Wheel Only (no pedals)</span>
+          <span class="radio-score">Score 2/5</span>
+        </label>
+        <label class="radio-pill selected" data-group="physical" data-val="wheel_pedals_seat" data-score="3">
+          <input type="radio" name="physical" checked>
+          <span class="radio-dot"></span>
+          <span class="radio-text">Steering Wheel + Pedals + Racing Seat</span>
+          <span class="radio-score">Score 3/5</span>
+        </label>
+        <label class="radio-pill" data-group="physical" data-val="partial_cab" data-score="4">
+          <input type="radio" name="physical">
+          <span class="radio-dot"></span>
+          <span class="radio-text">Vehicular Controls — Partial Cab</span>
+          <span class="radio-score">Score 4/5</span>
+        </label>
+        <label class="radio-pill" data-group="physical" data-val="full_cab" data-score="5">
+          <input type="radio" name="physical">
+          <span class="radio-dot"></span>
+          <span class="radio-text">Full Vehicular Cab with Controls</span>
+          <span class="radio-score">Score 5/5</span>
+        </label>
+      </div>
+    </div>
+
+    <div class="step-footer">
+      <div></div>
+      <div class="footer-right">
+        <button class="btn-back">← Back</button>
+        <button class="btn-next" id="btn-step2-next">Next →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════ -->
+  <!-- STEP 3: FIDELITY SCORE                 -->
+  <!-- ════════════════════════════════════════ -->
+  <div class="step-content" id="step-3" style="display:none">
+
+    <!-- Top Summary Block -->
+    <div class="score-summary-row">
+      <div class="score-summary-text">
+        <h3>Your Fidelity Score</h3>
+        <p>Based on the hardware you selected, here is your calculated fidelity score.</p>
+      </div>
+      <div class="score-summary-box" id="fidelity-badge">—</div>
+    </div>
+
+    <!-- Detailed Breakdown Table -->
+    <div class="breakdown-table">
+      <div class="breakdown-header">
+        <span>CATEGORY</span>
+        <span>SCORE</span>
+        <span>REMARKS</span>
+      </div>
+      <!-- Visual row -->
+      <div class="breakdown-row">
+        <div class="breakdown-cat">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b5bdb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+            <line x1="8" y1="21" x2="16" y2="21"/>
+          </svg>
+          <div>
+            <div class="breakdown-name">Visual</div>
+            <div class="breakdown-option" id="visual-option-label">Single PC Screen</div>
+          </div>
+        </div>
+        <div class="breakdown-score">
+          <span class="score-val" id="sv">1<span class="score-max">/5</span></span>
+        </div>
+        <div class="breakdown-remarks" id="visual-remarks"></div>
+      </div>
+      <!-- Motion row -->
+      <div class="breakdown-row">
+        <div class="breakdown-cat">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b5bdb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/>
+          </svg>
+          <div>
+            <div class="breakdown-name">Motion</div>
+            <div class="breakdown-option" id="motion-option-label">No Motion Base</div>
+          </div>
+        </div>
+        <div class="breakdown-score">
+          <span class="score-val" id="sm">1<span class="score-max">/5</span></span>
+        </div>
+        <div class="breakdown-remarks" id="motion-remarks"></div>
+      </div>
+      <!-- Physical row -->
+      <div class="breakdown-row">
+        <div class="breakdown-cat">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b5bdb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          <div>
+            <div class="breakdown-name">Physical</div>
+            <div class="breakdown-option" id="physical-option-label">Wheel + Pedals + Seat</div>
+          </div>
+        </div>
+        <div class="breakdown-score">
+          <span class="score-val" id="sp">3<span class="score-max">/5</span></span>
+        </div>
+        <div class="breakdown-remarks" id="physical-remarks"></div>
+      </div>
+    </div>
+
+    <!-- Flat warnings list (kept for backward compat) -->
+    <div class="warn-list" id="warn-list" style="display:none"></div>
+
+    <!-- Skip-note (referenced by updateConfirmButton) -->
+    <div class="skip-note" id="skip-note" style="display:none"></div>
+
+    <div class="step-footer">
+      <button class="btn-back">← Back</button>
+      <button class="btn-confirm" id="confirm-btn" onclick="handleConfirm()">
+        Confirm Hardware &amp; Enter Dashboard
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<script src="{{ url_for('static', filename='setup.js') }}"></script>
+</body>
+</html>
