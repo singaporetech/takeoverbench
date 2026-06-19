@@ -5,9 +5,8 @@
 ![License](https://img.shields.io/badge/license-TBD-lightgrey)
 ![Status](https://img.shields.io/badge/status-research--prototype-yellow)
 
-A benchmarking platform for **Takeover Requests (TOR)** in conditionally automated vehicles. TakeoverBench integrates scenario execution, takeover-alert triggering, HMI prototyping, telemetry capture, hardware-fidelity documentation, and automated report generation into a single, reproducible workflow.
+A benchmarking platform for **Takeover Requests (TOR)** in automated vehicles. TakeoverBench integrates scenario execution, takeover-alert triggering, HMI prototyping, telemetry capture, hardware-fidelity documentation, and automated report generation into a single, reproducible workflow.
 
-```
 ┌─────────────────────────────────────────────────────┐
 │                     TakeoverBench                   │
 │                                                     │
@@ -21,7 +20,6 @@ A benchmarking platform for **Takeover Requests (TOR)** in conditionally automat
 │                                │  (Configurable)   ││
 │                                └───────────────────┘│
 └─────────────────────────────────────────────────────┘
-```
 
 ## Key Features
 
