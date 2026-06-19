@@ -25,10 +25,10 @@ A benchmarking platform for **Takeover Requests (TOR)** in automated vehicles. T
 ## Key Features
 
 - **Configurable HMI** — Test takeover-alert concepts on an Android tablet without building a new system for each design. Adjust message, colours, position, images, and audio, and prototype rapidly.
-- **Predefined Scenario Sets** — Run a complete experiment session with a familiarisation run and multiple experimental takeover conditions. Load a scenario set, press play, and the system handles the entire end-to-end flow: loading the map, spawning vehicles, engaging autopilot, auto-triggering the TOR when the TTC threshold is crossed, and logging telemetry — all without per-run micromanagement.
+- **Predefined Scenario Sets** — Run a complete experiment session with a familiarisation run and multiple experimental takeover conditions. Load a scenario set, press play, and the system handles the entire end-to-end flow: loading the map, spawning vehicles, engaging autopilot, auto-triggering the TOR when the TTC threshold is crossed, and logging telemetry. All done without per-run micromanagement.
 - **Hardware Fidelity Scoring** — Document your physical simulator setup and get a visual, motion, and physical fidelity score on a 1–5 scale based on this [Fidelity Framework](https://doi.org/10.1016/j.ssci.2019.04.004). The platform automatically flags hardware limitations and warns which metrics may not be reliably computable from your setup.
-- **HCMTP-Aligned Telemetry** — Records 41 objective takeover metrics and reduces them to 9 principal performance dimensions using the [Human-Centred Comprehensive Measure of Take-Over Performance](https://doi.org/10.1109/tits.2022.3233623) framework.
-- **PDF Reports** — Generate standardised session reports combining scenario parameters, hardware fidelity, and HCMTP component scores.
+- **HCMTP Metrics** — Records 41 objective takeover metrics and reduces them to 9 principal categories using the [Human-Centred Comprehensive Measure of Take-Over Performance](https://doi.org/10.1109/tits.2022.3233623) framework.
+- **PDF Report Generation** — Generate standardised session reports combining scenario parameters, hardware fidelity, and HCMTP component scores.
 
 ## Repository Structure
 
@@ -44,9 +44,9 @@ takeoverbench/
 │   └── pyproject.toml         # Python package configuration
 ├── hmi-customizer/            # Native Android HMI (Jetpack Compose)
 │   ├── app/src/main/
-│   │   ├── java/.../          # Kotlin sources (MQTT, screens, UI)
+│   │   ├── java/.../          # Kotlin sources
 │   │   ├── res/               # Resources (icons, themes, strings)
-│   │   │   └── values/strings.xml   # App config (MQTT broker address)
+│   │   │   └── values/strings.xml   # App config
 │   └── build.gradle.kts       # Gradle build
 ├── docs/
 │   ├── hcmtp-metrics.md       # Full HCMTP metric mapping & PCA weights
