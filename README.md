@@ -7,6 +7,7 @@
 
 A benchmarking platform for **Takeover Requests (TOR)** in automated vehicles. TakeoverBench integrates scenario execution, takeover-alert triggering, HMI prototyping, telemetry capture, hardware-fidelity documentation, and automated report generation into a single, reproducible workflow.
 
+```
 ┌─────────────────────────────────────────────────────┐
 │                     TakeoverBench                   │
 │                                                     │
@@ -20,7 +21,7 @@ A benchmarking platform for **Takeover Requests (TOR)** in automated vehicles. T
 │                                │  (Configurable)   ││
 │                                └───────────────────┘│
 └─────────────────────────────────────────────────────┘
-
+```
 ## Key Features
 
 - **Configurable HMI** — Test takeover-alert concepts on an Android tablet without building a new system for each design. Adjust message, colours, position, images, and audio, and prototype rapidly.
