@@ -5,6 +5,8 @@
 ![License](https://img.shields.io/badge/license-TBD-lightgrey)
 ![Status](https://img.shields.io/badge/status-research--prototype-yellow)
 
+![TakeoverBench rig: CARLA monitor, steering wheel, Android tablet flashing TOR banner](docs/images/hero.jpg)
+
 A benchmarking platform for **Takeover Requests (TOR)** in conditionally automated vehicles. TakeoverBench integrates scenario execution, takeover-alert triggering, HMI prototyping, telemetry capture, hardware-fidelity documentation, and automated report generation into a single, reproducible workflow.
 
 ```
@@ -50,47 +52,37 @@ takeoverbench/
 │   │   │   └── values/strings.xml   # App config (MQTT broker address)
 │   └── build.gradle.kts       # Gradle build
 ├── docs/
-│   ├── hcmtp-metrics.md       # Full HCMTP metric mapping & PCA weights
-│        
+│   └── hcmtp-metrics.md       # Full HCMTP metric mapping & PCA weights
 └── README.md                  # This file
 ```
 
-## Quick Start
+## System Requirements & Installation
 
-### Prerequisites
+TakeoverBench requires a **Windows 10/11** machine capable of running **CARLA 0.9.16**, and an **Android tablet or emulator**. A **Logitech G29** steering wheel is recommended.
 
-- **Windows 10/11** (CARLA requirement)
-- **CARLA Simulator 0.9.16** with `AdditionalMaps_0.9.16` (Town06 highway map)
-- **Python 3.10–3.12** (CARLA 0.9.16 does not support 3.13+)
-- **Android device or emulator** (API 24+)
+Follow the dedicated setup guides for each component:
 
-### Dashboard Server
+1. **[Dashboard Server Setup](./dashboard-server/README.md)**
+2. **[HMI Customizer Setup](./hmi-customizer/README.md)**
 
-```bash
-cd dashboard-server
-pip install -e .
-copy .env.example .env     # Edit as needed
-```
+## Running a Demo Session
 
-Start CARLA with Vulkan:
+1. **CARLA and HMI connection** — Launch CARLA and the HMI app on your tablet. Open the dashboard in your browser, press connect, and both components connect automatically.
 
-```cmd
-CarlaUE4.exe -vulkan
-```
+   <img src="docs/images/setup-connection.gif" alt="Walkthrough: launching CARLA, connecting the HMI, and dashboard connection status" width="800">
 
-Start the dashboard:
+2. **Configure fidelity** — Select your hardware setup in the setup wizard. For a basic demo without a wheel, choose **Keyboard** (the system will warn about degraded metrics, which is expected).
 
-```cmd
-start_server.bat
-```
+   <img src="docs/images/fidelity-keyboard.png" alt="Hardware fidelity checklist — selecting keyboard" width="800">
 
-Navigate to `http://localhost:5000`.
+3. **Load and run a scenario** — Load **Preset 0: Training Familiarisation**, then click Start. The system auto-drives at 60 km/h and triggers the TOR on your tablet when the TTC threshold is crossed.
 
-### HMI Customizer
+   <img src="docs/images/dashboard-queue.png" alt="Dashboard showing scenario queue and Start button" width="800">
+   <img src="docs/images/hmi-tor-alert.png" alt="Android HMI displaying the takeover alert banner" width="800">
 
-1. Open `hmi-customizer/` in Android Studio and sync Gradle.
-2. Set your MQTT broker address in [`app/src/main/res/values/strings.xml`](./hmi-customizer/app/src/main/res/values/strings.xml) by editing the `default_mqtt_broker` value (default: `tcp://10.200.33.205:1883`).
-3. Run on your device or emulator. The app subscribes to takeover events and displays the configured alert banner.
+4. **Review results** — When the run ends, download the PDF report showing HCMTP performance scores.
+
+   <img src="docs/images/report-pcs.png" alt="PDF report excerpt with PC scores" width="800">
 
 ## Contributing
 
