@@ -26,6 +26,11 @@ STEER_MAX_DEG = 450.0       # CARLA steer -1..+1 → degrees
 BRAKE_MAX_MPA = 5.0        # CARLA brake 0..1 → MPa
 THROTTLE_TO_PCT = 100.0    # CARLA throttle 0..1 → %
 
+# Reaction-time thresholds (Li et al. 2023, Table II) — absolute values
+STEER_RT_THRESHOLD_DEG = 2.0   # steering wheel turned more than 2°
+BRAKE_RT_THRESHOLD = 0.10      # brake pedal more than 10%
+THROTTLE_RT_THRESHOLD = 0.05   # accelerator more than 5%
+
 # ═══════════════════════════════════════════════════════════════
 # PCA loading weights — Li et al. (2023) Table III
 # Format: {metric_name: loading_weight}
@@ -382,20 +387,27 @@ def compute_raw_metrics(rows: list[dict], tor_ts: float | None) -> dict:
     lane_offsets_arr = np.array(lane_offsets)
 
     # ── Metric values ──
-    # Reaction times (from telemetry metadata — already detected by tor.py)
-    rt = next((r.get("reaction_time_s", 0) for r in post_tor
-              if r.get("reaction_time_s") is not None), 0.0)
-    rts = next((r.get("rts", 0) for r in post_tor if r.get("rts") is not None), 0.0)
-    rtb = next((r.get("rtb", 0) for r in post_tor if r.get("rtb") is not None), 0.0)
-    rta = next((r.get("rta", 0) for r in post_tor if r.get("rta") is not None), 0.0)
-
     m = get_default_metrics()
 
-    # 1-4. Reaction times
-    m["RTS"] = rts
-    m["RTB"] = rtb
-    m["RTA"] = rta
-    m["RT"] = rt
+    # 1-4. Reaction times — paper Table II absolute thresholds, measured from
+    # the TOR. A channel that never crosses is censored at the window length
+    # (not 0.0, which would look like an instantaneous reaction).
+    t0 = float(tor_ts) if tor_ts is not None else float(timestamps[0])
+    window_s = max(0.0, float(timestamps[-1] - t0)) if n else 0.0
+    steer_thresh = STEER_RT_THRESHOLD_DEG / STEER_MAX_DEG
+
+    def _first_cross_after_tor(mask: "np.ndarray") -> float:
+        hits = np.nonzero(mask)[0]
+        return float(timestamps[hits[0]] - t0) if hits.size else window_s
+
+    rts = _first_cross_after_tor(steer_norm > steer_thresh)
+    rtb = _first_cross_after_tor(brake_norm > BRAKE_RT_THRESHOLD)
+    rta = _first_cross_after_tor(throttle_norm > THROTTLE_RT_THRESHOLD)
+
+    m["RTS"] = round(rts, 3)
+    m["RTB"] = round(rtb, 3)
+    m["RTA"] = round(rta, 3)
+    m["RT"] = round(min(rts, rtb, rta), 3)
 
     # 5. TTBT — time to lane boundary at TOR moment (first post-TOR row)
     if n > 0 and lane_widths[0] > 0 and abs(vel_lat[0]) > 0.001:

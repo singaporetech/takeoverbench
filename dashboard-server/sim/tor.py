@@ -11,24 +11,17 @@ import math
 import threading
 import time
 from typing import Any
-from .state import state, state_lock, ctx
+
+import carla
+
 from .constants import TOR_END_BUFFER_S
+from .state import ctx, state, state_lock
 
 logger = logging.getLogger(__name__)
-
-# HCMTP-aligned reaction detection thresholds (Li et al. 2023)
-# RTS: 2° at the steering wheel. STEER_MAX_DEG=450° (simulator lock-to-lock),
-# so 2/450 = 0.0044 on CARLA's -1..+1 scale.
-RTS_THRESHOLD = 0.0044  # steer > 2° (2° / 450° max = 0.0044)
-RTB_THRESHOLD = 0.10    # brake pedal > 10%
-RTA_THRESHOLD = 0.05    # throttle > 5%
-
-watching_for_reaction: bool = False
 
 
 def fire_tor(ctrl: Any) -> None:
     """Fire the TOR event: disengage autopilot, start auto-end timer."""
-    global watching_for_reaction
     from .mqtt import mqtt_manager
 
     now = time.time()
@@ -40,14 +33,18 @@ def fire_tor(ctrl: Any) -> None:
         # Read post_tor_drive_s from the current preset config
         post_tor_drive_s = state["scenario_config"].get("post_tor_drive_s", 10)
         state["tor_countdown_s"]  = post_tor_drive_s
-        # Reset reaction state fields
-        state["rts"] = None
-        state["rtb"] = None
-        state["rta"] = None
-        state["reaction_time_s"] = None
-        state["reaction_input"] = None
 
-        watching_for_reaction = True
+    # Hand over cleanly: apply one neutral control so the last autopilot
+    # command is not mistaken for a driver reaction by the absolute
+    # reaction-time thresholds.
+    if ctx["vehicle"] is not None:
+        try:
+            ctx["vehicle"].apply_control(
+                carla.VehicleControl(steer=0.0, throttle=0.0, brake=0.0)
+            )
+        except Exception:
+            logger.debug("Could not apply neutral control at TOR", exc_info=True)
+
     logger.info("TOR fired — autopilot disengaged, auto-end in %ss", post_tor_drive_s)
 
     mqtt_manager.publish_tor_start(
@@ -85,70 +82,35 @@ def fire_tor(ctrl: Any) -> None:
     threading.Timer(post_tor_drive_s, _auto_end_now).start()
 
 
-def check_reaction(ctrl: Any) -> None:
-    """
-    Detect HUMAN input after TOR using a hardware delta.
-
-    Uses a 100ms grace period to let the physical steering wheel/pedals
-    sync to CARLA before locking in the baseline resting state.  This
-    prevents the \"hardware snap\" where autopilot ghost commands are
-    misinterpreted as a human reaction.
-    """
-    global watching_for_reaction
-    now = time.time()
-
-    with state_lock:
-        tor_ts = state.get("tor_timestamp", now)
-        elapsed = now - tor_ts
-
-        # 1. The 100ms Hardware Sync Window
-        # Constantly overwrite the baseline until 100ms has passed.
-        if elapsed < 0.100:
-            state["human_baseline_steer"] = ctrl.steer
-            state["human_baseline_throttle"] = ctrl.throttle
-            state["human_baseline_brake"] = ctrl.brake
-            return  # skip detection during grace period
-
-        # 2. Physically settled baselines
-        baseline_steer    = state.get("human_baseline_steer", 0.0)
-        baseline_throttle = state.get("human_baseline_throttle", 0.0)
-        baseline_brake    = state.get("human_baseline_brake", 0.0)
-
-        # 3. Independent delta checks
-        if state.get("rts") is None and abs(ctrl.steer - baseline_steer) > RTS_THRESHOLD:
-            state["rts"] = round(elapsed, 3)
-
-        if state.get("rtb") is None and (ctrl.brake - baseline_brake) > RTB_THRESHOLD:
-            state["rtb"] = round(elapsed, 3)
-
-        if state.get("rta") is None and abs(ctrl.throttle - baseline_throttle) > RTA_THRESHOLD:
-            state["rta"] = round(elapsed, 3)
-
-        # 4. Global reaction time — locks on the FIRST detected input
-        if state.get("reaction_time_s") is None:
-            if state.get("rts") is not None:
-                state["reaction_time_s"] = state["rts"]
-                state["reaction_input"]  = "steer"
-            elif state.get("rtb") is not None:
-                state["reaction_time_s"] = state["rtb"]
-                state["reaction_input"]  = "brake"
-            elif state.get("rta") is not None:
-                state["reaction_time_s"] = state["rta"]
-                state["reaction_input"]  = "throttle"
-
-
 def calculate_ttc() -> float:
-    """Calculate time-to-collision based on current distance and speed."""
+    """Time-to-collision from the longitudinal gap and closing speed.
+
+    Uses the lead vehicle's position projected onto the ego's forward axis
+    (not straight-line distance) divided by the closing speed.
+    """
     if ctx["vehicle"] is None or ctx["lead_vehicle"] is None:
         return 999.0
     try:
-        ego_loc  = ctx["vehicle"].get_location()
+        ego_loc = ctx["vehicle"].get_location()
         lead_loc = ctx["lead_vehicle"].get_location()
-        distance = ego_loc.distance(lead_loc)
-        v        = ctx["vehicle"].get_velocity()
-        speed    = math.sqrt(v.x**2 + v.y**2 + v.z**2)
+        t = ctx["vehicle"].get_transform()
+        v = ctx["vehicle"].get_velocity()
+        speed = math.sqrt(v.x**2 + v.y**2 + v.z**2)
         if speed < 0.5:
             return 999.0
-        return round(distance / speed, 2)
+
+        yaw = math.radians(t.rotation.yaw)
+        rel_x = lead_loc.x - ego_loc.x
+        rel_y = lead_loc.y - ego_loc.y
+        gap = rel_x * math.cos(yaw) + rel_y * math.sin(yaw)
+        if gap <= 0:
+            return 999.0
+
+        lead_v = ctx["lead_vehicle"].get_velocity()
+        lead_speed = math.sqrt(lead_v.x**2 + lead_v.y**2 + lead_v.z**2)
+        closing = speed - lead_speed
+        if closing <= 0.1:
+            return 999.0
+        return round(gap / closing, 2)
     except Exception:
         return 999.0

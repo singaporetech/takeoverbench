@@ -25,10 +25,8 @@ def start_recording(run_id: str):
     sets ``autopilot_engaged`` to True.
     """
     global telemetry_rows
-    from . import tor as _tor
 
-    telemetry_rows        = []
-    _tor.watching_for_reaction = False
+    telemetry_rows = []
 
     with state_lock:
         state["recording"]        = True
@@ -37,9 +35,6 @@ def start_recording(run_id: str):
         state["tor_timestamp"]    = None
         state["tor_phase"]        = "idle"
         state["tor_countdown_s"]  = 0
-        state["rts"]              = None
-        state["rtb"]              = None
-        state["rta"]              = None
         state["autopilot_engaged"] = True
 
     logger.info("Recording started: %s", run_id)
@@ -54,18 +49,11 @@ def stop_recording_and_save() -> tuple | None:
 
     Returns ``(filepath, pcs)`` on success, ``None`` if no data to save.
     """
-    from . import tor as _tor
-    _tor.watching_for_reaction = False
-
     with state_lock:
         state["recording"] = False
         run_id = state["run_id"]
         rows   = list(telemetry_rows)
         tor_ts = state.get("tor_timestamp")
-        rts    = state.get("rts")
-        rtb    = state.get("rtb")
-        rta    = state.get("rta")
-        rt     = state.get("reaction_time_s")
 
     # Clear the buffer so a subsequent `start_recording()` call starts fresh
     telemetry_rows.clear()
@@ -89,14 +77,6 @@ def stop_recording_and_save() -> tuple | None:
     try:
         from .hcmtp import ALL_METRICS, compute_pcs, compute_raw_metrics
         raw = compute_raw_metrics(rows, tor_ts)
-        if rts is not None:
-            raw["RTS"] = rts
-        if rtb is not None:
-            raw["RTB"] = rtb
-        if rta is not None:
-            raw["RTA"] = rta
-        if rt is not None:
-            raw["RT"] = rt
         from .hcmtp import Standardizer as _Standardizer
         stdizers = _Standardizer.from_file()
         stdizer = (stdizers or {}).get(str(preset_id)) if stdizers else None

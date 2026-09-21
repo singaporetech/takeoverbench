@@ -116,6 +116,40 @@ def test_post_tor_filtering_without_tor_ts():
     assert m["Ymax"] == 0.0
 
 
+def test_reaction_uses_absolute_thresholds():
+    rows = [
+        row(0.0, steer=0.0, brake=0.0, throttle=0.0),
+        row(0.1, steer=0.0, brake=0.0, throttle=0.0),
+        row(0.2, steer=0.05, brake=0.0, throttle=0.0),  # 22.5 deg > 2 deg
+    ]
+    m = compute_raw_metrics(rows, tor_ts=0.0)
+    assert m["RTS"] == 0.2
+
+
+def test_reaction_censored_when_no_input():
+    # No input at all: censored at the window length, never 0.0 s.
+    rows = [row(t) for t in (0.0, 0.1, 0.2)]
+    m = compute_raw_metrics(rows, tor_ts=0.0)
+    assert m["RTS"] == 0.2
+    assert m["RTB"] == 0.2
+    assert m["RTA"] == 0.2
+    assert m["RT"] == 0.2
+
+
+def test_rt_is_minimum_of_channels():
+    rows = [
+        row(0.0),
+        row(0.1, brake=0.2),      # RTB = 0.1
+        row(0.2, steer=0.05),     # RTS = 0.2
+        row(0.3, throttle=0.10),  # RTA = 0.3
+    ]
+    m = compute_raw_metrics(rows, tor_ts=0.0)
+    assert m["RTB"] == 0.1
+    assert m["RTS"] == 0.2
+    assert m["RTA"] == 0.3
+    assert m["RT"] == 0.1
+
+
 def test_legacy_rows_still_compute():
     # Old CSVs have none of the raw signal columns; must not crash.
     legacy = [

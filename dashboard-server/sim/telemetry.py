@@ -173,15 +173,6 @@ def telemetry_loop() -> None:
                 if not already_fired and ttc < tor_ttc:
                     _tor.fire_tor(ctrl)
 
-                # ── Reaction time — only when human is driving ──
-                # Gate: autopilot_engaged must be False before we check inputs.
-                # This prevents the PID's own steer/brake from counting.
-                if _tor.watching_for_reaction:
-                    with state_lock:
-                        human_driving = not state["autopilot_engaged"]
-                    if human_driving:
-                        _tor.check_reaction(ctrl)
-
                 # ── Auto-end countdown — update every telemetry tick ──
                 with state_lock:
                     if state.get("tor_phase") == "coasting" and state.get("tor_timestamp"):

@@ -19,10 +19,10 @@ This document states exactly how each of the 41 HCMTP metrics is calculated in T
 
 | # | Metric | Unit | Paper definition (Table II) | How the code calculates it | Our assumption | Status |
 |---|--------|------|-----------------------------|----------------------------|----------------|--------|
-| 1 | RTS | s | The time from the TOR until the driver turns the steering wheel more than 2 degrees. | elapsed when abs(steer - 100ms baseline) > 0.0044 | Absolute 2 deg threshold (paper). Steering degrees via steer x450 (assumes 900 deg lock-to-lock). Window TOR->end. | BUG |
-| 2 | RTB | s | The time from the TOR until the driver depresses the brake pedal more than 10%. | elapsed when (brake - baseline) > 0.10 | Absolute 10% threshold (paper). Window TOR->end. | BUG |
-| 3 | RTA | s | The time from the TOR until the driver depresses the accelerator pedal more than 5%. | elapsed when abs(throttle - baseline) > 0.05 | Absolute 5% threshold (paper). Window TOR->end. | BUG |
-| 4 | RT | s | The minimum value of the RTS, RTB, and RTA. | first detected input (tor.py) | Min of available RTS/RTB/RTA; missing channels treated as missing. Window TOR->end. | BUG |
+| 1 | RTS | s | The time from the TOR until the driver turns the steering wheel more than 2 degrees. | first t after TOR where steer > 2 deg (steer_norm > 2/450) | Absolute 2 deg threshold (paper). Degrees via steer x450 (assumes 900 deg lock-to-lock). Window TOR->end. | OK-ASSUMED |
+| 2 | RTB | s | The time from the TOR until the driver depresses the brake pedal more than 10%. | first t after TOR where brake > 10% | Absolute 10% threshold (paper). Window TOR->end. | OK |
+| 3 | RTA | s | The time from the TOR until the driver depresses the accelerator pedal more than 5%. | first t after TOR where throttle > 5% | Absolute 5% threshold (paper). Window TOR->end. | OK |
+| 4 | RT | s | The minimum value of the RTS, RTB, and RTA. | min(RTS, RTB, RTA); a channel that never crosses is censored at the window length | Missing channels censored at the window length (not 0 s, which would be an instantaneous reaction). | OK-ASSUMED |
 | 5 | TTBT | s | The time interval between the ego vehicle and the boundary at take-over timing. | dist_to_edge / \|lateral velocity\| at TOR (measured velocity) | Snapshot at TOR. Lane width/offset from CARLA waypoint centre; lateral velocity from projected CARLA velocity (planned). | APPROX |
 | 6 | SAmax | deg | Maximum steering wheel angle after the TOR. | max(abs(steer_deg)); steer_deg = steer*450 | Peak MAGNITUDE of steering (assumption; paper says 'maximum'). Degrees via steer x450 (assumes 900 deg lock-to-lock). Window TOR->end. | OK-ASSUMED |
 | 7 | SAmean | deg | Mean steering wheel angle after the TOR. | mean(abs(steer_deg)) | MAGNITUDE mean (assumption; paper says 'mean'). Degrees via steer x450 (assumes 900 deg lock-to-lock). | OK-ASSUMED |
@@ -53,7 +53,7 @@ This document states exactly how each of the 41 HCMTP metrics is calculated in T
 | 32 | LoASD | m/s^2 | The standard deviation of the longitudinal acceleration after the TOR. | std(acc_fwd) | Longitudinal accel = CARLA get_acceleration() forward projection (planned). Current code uses d(speed)/dt. | OK |
 | 33 | MRLD | m | The minimum relative longitudinal distance between the ego vehicle and other vehicles after the TOR. | min(abs(lead_long_m)) = longitudinal gap to lead | Longitudinal gap = (lead-ego) projected on ego forward axis (planned). Current code uses Euclidean distance. | OK |
 | 34 | HFCS | unitless | The ratio between the power of the high frequency component (0.3-0.6 Hz) of the steering wheel angle and all the other steering activities after the TOR. | 0.0 (hardcoded) | Steering power in 0.3-0.6 Hz band / total steering power. Not implemented. | DEFERRED |
-| 35 | TTC | s | Minimum time to collision after the TOR. | min(ttc where ttc<998) | distance/speed to lead; 999 if no lead or speed < 0.5 m/s. Min over window. | OK |
+| 35 | TTC | s | Minimum time to collision after the TOR. | longitudinal gap / closing speed (min after TOR) | Gap = lead position projected on ego forward axis; closing speed = ego speed - lead speed. | OK |
 | 36 | DTC | m | Minimum distance to collision after the TOR. | lead_long at the min-TTC sample | Distance at the min-TTC sample (planned). Current code = min_TTC x mean speed. | OK |
 | 37 | TLC | s | Minimum time to lane crossing after the TOR. | min(dist_to_edge / \|lateral velocity\|) using measured lateral velocity | min(distance_to_edge / \|lateral velocity\|); depends on the lateral-velocity definition. | OK-ASSUMED |
 | 38 | TCLC | s | Time to complete a lane change. | 0.0 (hardcoded) | Time from lane_id change to settle. Not implemented. | DEFERRED |

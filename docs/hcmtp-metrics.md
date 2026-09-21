@@ -17,7 +17,7 @@ The CSV is canonical: to change a metric's definition, assumption, formula, or s
 python dashboard-server/scripts/generate_hcmtp_doc.py
 ```
 
-**Current status (from the CSV):** OK 21 · OK-ASSUMED 6 · APPROX 5 · BUG 6 · DEFERRED 2 · DECIDE 1.
+**Current status (from the CSV):** OK 23 · OK-ASSUMED 8 · APPROX 5 · BUG 2 · DECIDE 1 · DEFERRED 2.
 
 ### Approximation Notes
 
