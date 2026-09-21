@@ -31,101 +31,106 @@ THROTTLE_TO_PCT = 100.0    # CARLA throttle 0..1 → %
 # PCA loading weights — Li et al. (2023) Table III
 # Format: {metric_name: loading_weight}
 # ═══════════════════════════════════════════════════════════════
-# Note: Table III uses "YR" as a truncation of YRmax (confirmed by authors).
-# "LaAmax_alone" is a formatting artifact — it is the regular LaAmax.
-# See docs/hcmtp-metrics.md for full cross-reference.
+# Source of truth: Li et al. (2023), Table III, p. 4243.
+# DOI: 10.1109/TITS.2022.3233623
+# IMPORTANT: Table III lists every metric as its OWN row. There are no
+# "(incl.)" pairs. Adjacent metrics (e.g. Ymax vs Ymean, YAmax vs YAmean,
+# SAmean vs SASD, YRmean vs YRSD, LaVmean vs LaVmax, LaAmean vs LaAmax vs
+# LaASD) carry DIFFERENT loadings on DIFFERENT PCs — never copy one onto
+# the other. Transcribed 2026-09-21 from the PDF; verify against p. 4243.
 
 PC1_WEIGHTS = {
-    "SASD": -0.381, "SAmean": -0.381,
-    "LaASD": -0.351, "LaAmax": -0.653,
-    "YRSD": -0.337, "YRmean": -0.337,
-    "Ymean": -0.299, "Ymax": -0.299,
-    "LaVmean": -0.292, "LaVmax": -0.292,
-    "YSD": -0.290,
     "SAmax": -0.267,
-    "HFCS": -0.264,
+    "SASD": -0.381,
+    "LaAmax": -0.302,
+    "LaASD": -0.351,
     "YRmax": -0.251,
+    "YRSD": -0.337,
+    "Ymax": -0.299,
+    "YSD": -0.290,
+    "LaVmax": -0.292,
     "LaVSD": -0.241,
+    "YAmean": -0.094,
     "YASD": -0.112,
-    "YAmean": -0.094, "YAmax": -0.094,
-    "TLC": 0.056,
     "MRLD": 0.004,
+    "HFCS": -0.264,
+    "TLC": 0.056,
 }
 
 PC2_WEIGHTS = {
+    "Bmax": -0.428,
     "Bmean": -0.498,
     "BSD": -0.470,
-    "Bmax": -0.428,
-    "LoASD": -0.328,
-    "LoAmax": -0.235,
     "RTB": 0.332,
-    "Ymean": 0.137, "Ymax": 0.137,
-    "MRLD": 0.119,
     "RTA": 0.037,
-    "YAmean": 0.019, "YAmax": 0.019,
-    "LoAmean": 0.016,
     "RT": 0.012,
+    "Ymean": 0.137,
+    "YAmean": 0.019,
+    "LoAmax": -0.235,
+    "LoAmean": 0.016,
+    "LoASD": -0.328,
+    "MRLD": 0.119,
     "TLC": -0.037,
 }
 
 PC3_WEIGHTS = {
-    "TCLC": 0.518,
-    "TTC": 0.517,
-    "DTC": 0.497,
-    "TTBT": 0.465,
     "RTS": 0.214,
     "RTB": 0.115,
+    "TTBT": 0.465,
     "Bmean": 0.108,
+    "YAmean": -0.095,
     "MRLD": 0.103,
-    "YAmean": -0.095, "YAmax": -0.095,
+    "TTC": 0.517,
+    "DTC": 0.497,
+    "TCLC": 0.518,
 }
 
 PC4_WEIGHTS = {
-    "Thmean": 0.497,
-    "Thmax": 0.494,
-    "LoAmean": 0.377,
-    "ThSD": 0.279,
-    "MRLD": 0.156,
-    "Ymean": 0.096, "Ymax": 0.096,
-    "LoAmax": 0.028,
     "RTA": -0.336,
+    "Thmax": 0.494,
+    "Thmean": 0.497,
+    "ThSD": 0.279,
+    "Ymean": 0.096,
+    "LoAmax": 0.028,
+    "LoAmean": 0.377,
+    "MRLD": 0.156,
 }
 
 PC5_WEIGHTS = {
-    "Ymean": 0.121, "Ymax": 0.121,
-    "LoAmean": -0.064,
-    "RTA": -0.088,
-    "RTB": -0.118,
-    "RT": -0.537,
-    "TLC": -0.574,
     "RTS": -0.585,
+    "RTB": -0.118,
+    "RTA": -0.088,
+    "RT": -0.537,
+    "Ymean": 0.121,
+    "LoAmean": -0.064,
+    "TLC": -0.574,
 }
 
 PC6_WEIGHTS = {
-    "YRSD": 0.617, "YRmean": 0.617,
-    "LaASD": 0.604, "LaAmax": 0.604,
-    "YAmean": 0.243, "YAmax": 0.243,
+    "SAmean": 0.442,
+    "LaAmean": 0.604,
+    "YRmean": 0.617,
+    "YAmean": 0.243,
     "LoAmax": 0.066,
 }
 
 PC7_WEIGHTS = {
-    "SASD": 0.442, "SAmean": 0.442,
-    "Ymean": 0.153, "Ymax": 0.153,
+    "Ymean": 0.153,
     "MRLD": -0.022,
+    "ECLmax": 0.550,
+    "ECLmean": 0.657,
+    "SDLP": 0.516,
 }
 
 PC8_WEIGHTS = {
-    "ECLmean": 0.657,
-    "ECLmax": 0.550,
-    "SDLP": 0.516,
     "YRmax": -0.103,
-    "YAmean": -0.889, "YAmax": -0.889,
+    "YAmax": -0.889,
+    "YAmean": 0.149,
 }
 
 PC9_WEIGHTS = {
-    "Ymean": 0.241, "Ymax": 0.241,
-    "YAmean": 0.149, "YAmax": 0.149,
-    "LaVmean": -0.871, "LaVmax": -0.871,
+    "Ymean": 0.241,
+    "LaVmean": -0.871,
 }
 
 PC_WEIGHTS = [PC1_WEIGHTS, PC2_WEIGHTS, PC3_WEIGHTS, PC4_WEIGHTS,
