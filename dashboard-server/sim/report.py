@@ -229,24 +229,24 @@ PC_NAMES: list[dict[str, Any]] = [
         "neg_critical": "Severe high-frequency physical veering vectors"
     },
     {
-        "name": "PC7 — Lateral Composite", 
-        "positive": "Large steering amplitude", 
-        "negative": "Small, smooth corrections", 
-        "target": "-1.0 to +0.5", 
-        "ideal": "-0.3",
-        "pos_elevated": "Widen steering adjustment arcs",
-        "neg_elevated": "Extremely constrained correction sweeps",
-        "neg_critical": "Unstable, sweeping directional weaving cycles"
+        "name": "PC7 — Lane Keeping",
+        "positive": "Wandering, high lane-centre error",
+        "negative": "Centred in lane",
+        "target": "-1.0 to +1.0",
+        "ideal": "0.0",
+        "pos_elevated": "Mild lane-centre drifting",
+        "neg_elevated": "Rigid lane-centre hugging",
+        "pos_critical": "Significant lateral lane departure"
     },
     {
-        "name": "PC8 — Lane Keeping", 
-        "positive": "Wandering, high lane error", 
-        "negative": "Centered in lane", 
-        "target": "-1.0 to +1.0", 
+        "name": "PC8 — Yaw Stability",
+        "positive": "Smooth yaw, stable heading",
+        "negative": "High yaw acceleration (unstable)",
+        "target": "-1.0 to +1.0",
         "ideal": "0.0",
-        "pos_elevated": "Mild lane profile center line drifting",
-        "neg_elevated": "Rigid alignment hugging behavior",
-        "neg_critical": "Significant structural lateral lane departure"
+        "pos_elevated": "Over-damped yaw response",
+        "neg_elevated": "Elevated yaw acceleration",
+        "neg_critical": "Severe yaw instability — loss of directional control"
     },
     {
         "name": "PC9 — Lateral Velocity", 
@@ -262,7 +262,7 @@ PC_NAMES: list[dict[str, Any]] = [
 
 PC_TARGETS: list[tuple[float, float]] = [
     (-2.0, 1.0), (-2.0, 0.5), (-5.0, -1.0), (-1.0, 1.0), (0.5, 5.0),
-    (-1.0, 1.0), (-1.0, 0.5), (-1.0, 1.0), (-1.0, 0.5),
+    (-1.0, 1.0), (-1.0, 1.0), (-1.0, 1.0), (-1.0, 0.5),
 ]
 
 PC_DANGER_RANGES = [
@@ -271,8 +271,8 @@ PC_DANGER_RANGES = [
     ["PC3", "< -8.0", "Near-collision or actual collision"],
     ["PC5", "< -1.0 or > 6.0", "Extremely slow reaction or noise/crash"],
     ["PC6", "> +3.0", "Highly unstable lateral control — veering"],
-    ["PC7", "> +3.0", "Very large steering corrections"],
-    ["PC8", "> +3.0", "Significant lane deviation"],
+    ["PC7", "> +3.0", "Significant lateral lane departure"],
+    ["PC8", "< -3.0", "Severe yaw instability — loss of directional control"],
     ["PC9", "< -3.0", "Severe lateral swerving (loss of control)"],
 ]
 
@@ -283,9 +283,9 @@ def check_danger(pc_index: int, value: float) -> bool:
     if pc_index == 2 and value < -8.0: return True
     if pc_index == 4 and (value < -1.0 or value > 6.0): return True
     if pc_index == 5 and value > 3.0: return True
-    if pc_index == 6 and value > 3.0: return True
-    if pc_index == 7 and value > 3.0: return True
-    if pc_index == 8 and value < -3.0: return True
+    if pc_index == 6 and value > 3.0: return True   # PC7 lane keeping (wandering)
+    if pc_index == 7 and value < -3.0: return True  # PC8 yaw stability (unstable)
+    if pc_index == 8 and value < -3.0: return True  # PC9 lateral swerving
     return False
 
 def get_dynamic_behavior(pc_index: int, v: float, info: dict, is_danger: bool) -> str:

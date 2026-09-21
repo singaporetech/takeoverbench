@@ -216,8 +216,8 @@ Each PC score is a standardized value. The direction (positive vs negative) depe
 | PC4 | Longitudinal Throttle | Heavy or jerky throttle application | Smooth, light throttle |
 | PC5 | Reaction Time | Fast reaction | Slow reaction |
 | PC6 | Lateral Fine Control | Jerky yaw/lateral movements (high variance) | Smooth, stable |
-| PC7 | Lateral Composite | Large steering amplitude | Small, smooth corrections |
-| PC8 | Lane Keeping | Wandering, high lane center error | Centered in lane |
+| PC7 | Lane Keeping | Wandering, high lane-centre error | Centred in lane |
+| PC8 | Yaw Stability | Smooth yaw, stable heading | High yaw acceleration (unstable) |
 | PC9 | Lateral Velocity | Stable lateral position | Fast side-to-side movement (swerving) |
 
 ### What a "Good Takeover" Looks Like
@@ -232,8 +232,8 @@ PC scores are z-scores. After proper calibration, a well-executed takeover shoul
 | PC4 | -1.0 to +1.0 | ~0.0 | Throttle control similar to cruise — smooth transitions |
 | PC5 | +0.5 to +5.0 | > +2.0 | Faster is better. A score of +3 means reaction time is 3σ faster than human baseline |
 | PC6 | -1.0 to +1.0 | ~0.0 | No high-frequency jitter |
-| PC7 | -1.0 to +0.5 | ~-0.3 | Smooth, small steering angle changes |
-| PC8 | -1.0 to +1.0 | ~0.0 | Stays near lane center |
+| PC7 | -1.0 to +1.0 | ~0.0 | Stays near the lane centre |
+| PC8 | -1.0 to +1.0 | ~0.0 | Smooth, stable yaw |
 | PC9 | -1.0 to +0.5 | ~-0.3 | Stable lateral movement |
 
 ### Warning Signs (Bad Takeovers)
@@ -245,8 +245,8 @@ PC scores are z-scores. After proper calibration, a well-executed takeover shoul
 | PC3 | < -8.0 | Near-collision or actual collision (TTC near 0) |
 | PC5 | < -1.0 or > 6.0 | < -1: extremely slow reaction. > 6: may be noise or crash data |
 | PC6 | > +3.0 | Highly unstable lateral control — veering |
-| PC7 | > +3.0 | Very large steering corrections — driver fighting the car |
-| PC8 | > +3.0 | Significant lane deviation |
+| PC7 | > +3.0 | Significant lateral lane departure |
+| PC8 | < -3.0 | Severe yaw instability — loss of directional control |
 
 ### Important Limitations
 

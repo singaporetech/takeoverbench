@@ -129,8 +129,8 @@ TakeoverBench implements the **Human-Centred Comprehensive Measure of Take-Over 
 | PC4 — Longitudinal Throttle | — | Throttle smoothness |
 | PC5 — Reaction Time | — | Speed of steering/braking/throttle response |
 | PC6 — Lateral Fine Control | — | High-frequency yaw and lateral corrections |
-| PC7 — Lateral Composite | — | Steering amplitude |
-| PC8 — Lane Keeping | — | Lane centre deviation |
+| PC7 — Lane Keeping | — | Lane-centre deviation |
+| PC8 — Yaw Stability | — | Yaw acceleration / directional stability |
 | PC9 — Lateral Velocity | — | Side-to-side movement stability |
 
 See [`docs/hcmtp-metrics.md`](../docs/hcmtp-metrics.md) for the full metric definitions, PCA loading weights, and conversion factors.
