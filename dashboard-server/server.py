@@ -326,6 +326,23 @@ def clear_queue():
 
 
 # ─────────────────────────────────────────
+# MANUAL STOP — evaluator safety net
+# ─────────────────────────────────────────
+@app.route("/end-scenario", methods=["POST"])
+def end_scenario_route():
+    """Stop the current run. Telemetry performs the teardown on the next tick.
+
+    The queue is not advanced, so the evaluator can retry the same preset.
+    """
+    with runner.state_lock:
+        if not runner.state["scenario_running"]:
+            return jsonify({"status": "idle", "message": "No scenario running"})
+        runner.state["manual_stop_requested"] = True
+    _log("Manual stop requested", "warn")
+    return jsonify({"status": "stopping"})
+
+
+# ─────────────────────────────────────────
 # SCENARIO CONFIG (direct, used internally)
 # ─────────────────────────────────────────
 @app.route("/configure-scenario", methods=["POST"])

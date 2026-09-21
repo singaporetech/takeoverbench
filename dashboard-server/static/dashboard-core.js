@@ -13,6 +13,7 @@ let sessionRunCount = 0;
 let activeSetId = null;
 let activeSetName = null;
 let runHadSet = false;   // was a scenario set active when this run started?
+let stoppingRequested = false;  // evaluator pressed Stop for the current run
 
 function updateCarlaStatus(connected) {
   isCarlaConnected = connected;
@@ -171,6 +172,20 @@ function downloadReport() {
     });
 }
 
+// ── Manual stop (evaluator safety net) ──
+async function stopScenario() {
+  if (!isRunning) return;
+  stoppingRequested = true;
+  const btn = document.getElementById('btn-stop');
+  if (btn) { btn.disabled = true; btn.textContent = 'STOPPING...'; }
+  try {
+    await fetch('/end-scenario', {method:'POST'});
+    setRunStatus('Stopping run…', '');
+  } catch (e) {
+    setRunStatus('Could not stop run', '');
+  }
+}
+
 // ── Results link (report QR target) ──
 async function saveQrUrl() {
   const el = document.getElementById('qr-url-input');
@@ -215,6 +230,13 @@ async function pollStatus() {
 
     renderQueue();
 
+    // Manual stop button mirrors the running state.
+    const stopBtn = document.getElementById('btn-stop');
+    if (stopBtn) {
+      stopBtn.disabled = !isRecording || stoppingRequested;
+      stopBtn.textContent = stoppingRequested ? 'STOPPING...' : 'Stop Scenario';
+    }
+
     // Auto-show video feed if scenario is running
     // BUG-08 fix: removed the inner startPolling() call — it was resetting the interval every tick
     if (data.scenario_running) {
@@ -228,6 +250,7 @@ async function pollStatus() {
     if (isRecording && !data.scenario_running) {
       isRecording = false;
       isRunning = false;
+      stoppingRequested = false;
 
       // Re-enable start button (gated by CARLA + queue via updateCarlaStatus)
       document.getElementById('btn-start').textContent = 'START SCENARIO';

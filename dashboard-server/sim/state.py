@@ -39,6 +39,7 @@ state: dict[str, Any] = {
     "tor_countdown_s": 0,  # seconds remaining on auto-end timer
     "run_stopping": False,  # True while braking to a halt at end of run
     "stop_started_ts": None,
+    "manual_stop_requested": False,  # evaluator pressed Stop on the dashboard
     # Post-TOR: hold this speed (m/s) until the driver provides input
     "cruise_target_ms": None,
     # Latest driver input, independent of what we apply to the vehicle

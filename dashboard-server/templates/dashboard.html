@@ -58,6 +58,8 @@
         <span class="run-id-value" id="run-id-display">--</span>
       </div>
       <button class="btn btn-start" id="btn-start" onclick="startScenario()">Start Scenario</button>
+      <button class="btn btn-stop" id="btn-stop" onclick="stopScenario()" disabled
+              title="Stop the current run (safety net)">Stop Scenario</button>
       <button class="btn btn-report" id="btn-pdf" onclick="downloadReport()" disabled
               title="Available after at least one scenario run completes">Session Report</button>
       <!-- Evaluator-facing run status (the participant is cued inside CARLA) -->

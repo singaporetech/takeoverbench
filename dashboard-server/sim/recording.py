@@ -37,6 +37,7 @@ def start_recording(run_id: str):
         state["tor_countdown_s"]  = 0
         state["run_stopping"]     = False
         state["stop_started_ts"]  = None
+        state["manual_stop_requested"] = False
         state["cruise_target_ms"] = None
         state["human_control"]    = {"steer": 0.0, "throttle": 0.0, "brake": 0.0}
         state["autopilot_engaged"] = True

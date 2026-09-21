@@ -123,6 +123,19 @@ def telemetry_loop() -> None:
             # Keep the participant-facing message on screen (redrawn each tick)
             _hud.draw(ctx["world"])
 
+        # ── Manual stop (evaluator pressed Stop on the dashboard) ──
+        if state.get("manual_stop_requested"):
+            with state_lock:
+                state["manual_stop_requested"] = False
+            try:
+                from .scenario import end_scenario
+                end_scenario()
+                _hud.clear_message()
+                logger.info("Scenario stopped manually by evaluator")
+            except Exception as e:
+                logger.error("Manual stop failed: %s", e)
+            continue
+
         # ── End-of-run stopping: wait for the ego to halt, then finish ──
         if state.get("tor_phase") == "stopping":
             speed_ms = 0.0
