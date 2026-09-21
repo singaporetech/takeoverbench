@@ -72,6 +72,10 @@ def main() -> None:
         help="Skip CSVs whose path contains this substring (repeatable)",
     )
     parser.add_argument("--min-rows", type=int, default=0, help="Skip runs shorter than this many rows")
+    parser.add_argument(
+        "--keep-collisions", action="store_true",
+        help="Include runs flagged as collisions (default: exclude them)",
+    )
     parser.add_argument("--output", default=None, help="Output path (default: <project>/calibration.json)")
     args = parser.parse_args()
 
@@ -100,6 +104,11 @@ def main() -> None:
             continue
         if len(rows) < args.min_rows:
             print(f"  Skipping {path.name}: {len(rows)} rows < min-rows {args.min_rows}")
+            continue
+
+        collisions = sum(1 for r in rows if str(r.get("collision", "")).strip() in ("1", "1.0"))
+        if collisions and not args.keep_collisions:
+            print(f"  Skipping {path.name}: collision detected ({collisions} samples)")
             continue
 
         preset_id = _parse_preset_id(rows[0].get("preset_id"))
@@ -155,6 +164,7 @@ def main() -> None:
         "runs_dir": str(runs_dir),
         "excluded_substrings": args.exclude,
         "min_rows": args.min_rows,
+        "keep_collisions": args.keep_collisions,
         "csv_files_used": len(kept),
         "sigma_floor": MIN_SIGMA,
     }

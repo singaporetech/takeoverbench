@@ -41,6 +41,10 @@ TOR_END_BUFFER_S = 0.5
 # End-of-run: brake to a halt before removing the ego vehicle
 STOP_SPEED_THRESHOLD_MS = 0.5
 STOP_TIMEOUT_S = 4.0
+
+# A sample is flagged as a collision when horizontal acceleration exceeds this.
+# Normal driving/braking is well under 10 m/s^2; collision spikes are >100.
+COLLISION_ACCEL_THRESHOLD_MS = 30.0
 TELEMETRY_INTERVAL_S = 0.033  # ~30 Hz
 CONTROLLER_INTERVAL_S = 0.033 # ~30 Hz
 SPAWN_RETRY_COUNT = 20

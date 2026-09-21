@@ -13,6 +13,7 @@ import carla
 
 from . import hud as _hud
 from .constants import (
+    COLLISION_ACCEL_THRESHOLD_MS,
     STOP_SPEED_THRESHOLD_MS,
     STOP_TIMEOUT_S,
     TELEMETRY_INTERVAL_S,
@@ -162,6 +163,7 @@ def telemetry_loop() -> None:
                 acc       = ctx["vehicle"].get_acceleration()
                 ang_vel   = ctx["vehicle"].get_angular_velocity()
                 speed_ms  = math.sqrt(v.x**2 + v.y**2 + v.z**2)
+                acc_mag   = math.sqrt(acc.x**2 + acc.y**2)
                 ctrl      = ctx["vehicle"].get_control()
                 loc       = ctx["vehicle"].get_location()
                 t         = ctx["vehicle"].get_transform()
@@ -243,6 +245,7 @@ def telemetry_loop() -> None:
                     "road_id": road_id,
                     "lane_width_m": lane_width_m,
                     "lane_offset_signed_m": lane_offset_signed_m,
+                    "collision": 1 if acc_mag > COLLISION_ACCEL_THRESHOLD_MS else 0,
                     "post_tor": 1 if state.get("tor_timestamp") is not None else 0,
                 }
 
