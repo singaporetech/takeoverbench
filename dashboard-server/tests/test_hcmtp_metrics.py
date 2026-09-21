@@ -150,6 +150,40 @@ def test_rt_is_minimum_of_channels():
     assert m["RT"] == 0.1
 
 
+def test_hfcs_pure_band_sine():
+    # A pure 0.45 Hz steering oscillation sits inside the 0.3-0.6 Hz band.
+    dt = 1.0 / 30.0
+    rows = [
+        row(i * dt, steer=0.1 * math.sin(2 * math.pi * 0.45 * i * dt))
+        for i in range(300)  # 10 s
+    ]
+    m = compute_raw_metrics(rows, tor_ts=0.0)
+    assert m["HFCS"] > 0.8
+
+
+def test_hfcs_zero_when_no_steering():
+    rows = [row(i * 0.033, steer=0.0) for i in range(60)]
+    m = compute_raw_metrics(rows, tor_ts=0.0)
+    assert m["HFCS"] == 0.0
+
+
+def test_lane_change_tclc_and_ecl_window():
+    import statistics
+
+    offsets = [0.0, 0.0, 0.0, 0.0, 0.0, 1.5, 0.2, -0.1, 0.05, 0.0]
+    lanes = [1, 1, 1, 1, 1, 2, 2, 2, 2, 2]
+    rows = [
+        row(i * 0.1, lane_offset_signed_m=o, lane_id=lane, lane_width_m=3.5)
+        for i, (o, lane) in enumerate(zip(offsets, lanes))
+    ]
+    m = compute_raw_metrics(rows, tor_ts=0.0)
+    # Lane change at index 5 (t=0.5), centred in the new lane at index 6 (t=0.6).
+    assert m["TCLC"] == 0.1
+    # ECL window = offsets from index 6 onward: max |offset| = 0.2.
+    assert m["ECLmax"] == 0.2
+    assert m["SDLP"] == round(statistics.pstdev(offsets), 3)
+
+
 def test_legacy_rows_still_compute():
     # Old CSVs have none of the raw signal columns; must not crash.
     legacy = [

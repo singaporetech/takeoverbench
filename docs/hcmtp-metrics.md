@@ -17,7 +17,7 @@ The CSV is canonical: to change a metric's definition, assumption, formula, or s
 python dashboard-server/scripts/generate_hcmtp_doc.py
 ```
 
-**Current status (from the CSV):** OK 23 · OK-ASSUMED 8 · APPROX 5 · BUG 2 · DECIDE 1 · DEFERRED 2.
+**Current status (from the CSV):** OK 23 · OK-ASSUMED 13 · APPROX 5 · BUG 0 · DECIDE 0 · DEFERRED 0.
 
 ### Approximation Notes
 
@@ -25,12 +25,14 @@ python dashboard-server/scripts/generate_hcmtp_doc.py
 - **Brake (Bmax, Bmean, BSD)**: CARLA outputs normalized brake (0 to 1). Converted via x5 MPa assuming 5 MPa max brake pressure. Paper's simulator brake spec unknown.
 - **Lane-based (TTBT, TLC, SDLP, ECLmax, ECLmean)**: Computed from CARLA waypoint lane_width and lateral offset from lane center. Offset computed as \|vehicle_pos - waypoint_center\|. Waypoints give the road centerline; real lane center may differ slightly on curved segments.
 
-### Deferred Metrics
+### Previously Deferred Metrics
 
-- **HFCS (metric 34)**: Requires rolling FFT buffer of steering samples. Implementation deferred.
-- **TCLC (metric 38)**: Requires lane change start/end detection (lane_id transitions). Implementation deferred.
+- **HFCS (metric 34)** — now implemented: ratio of steering power in the 0.3–0.6 Hz band to total steering power (FFT), using the recorded steering signal.
+- **TCLC (metric 38)** — now implemented: time from a `lane_id` transition to the vehicle being centred in the new lane (`|offset| ≤ 0.3 m`). Requires a lane change; 0 if none is detected.
+- **ECLmax/ECLmean (metrics 39–40)** — now use the post-lane-change window (falling back to post-TOR when no lane change is detected).
+- **SDLP (metric 41)** — now the SD of the **signed** lateral position.
 
-**Impact**: PC3 (Distance Security) has reduced accuracy because TCLC is not yet implemented. Once lane-change detection is added, PC3 will be complete. ECLmax/ECLmean/SDLP are now computed via waypoints.
+These operationalisations are recorded in the `assumption` column of [`hcmtp-metric-audit.csv`](./hcmtp-metric-audit.csv); the paper defines them in a single line each, so the exact window/threshold is our documented choice.
 
 **Note:** Table III lists every metric as its **own row**. It does **not** use "(incl.)" grouping — adjacent metrics such as `Ymax`/`Ymean`, `YAmax`/`YAmean`, `SAmean`/`SASD`, `YRmean`/`YRSD`, and `LaVmean`/`LaVmax` carry **different** loadings on **different** PCs. Never duplicate a loading across a pair.
 

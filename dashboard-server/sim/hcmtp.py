@@ -31,6 +31,11 @@ STEER_RT_THRESHOLD_DEG = 2.0   # steering wheel turned more than 2°
 BRAKE_RT_THRESHOLD = 0.10      # brake pedal more than 10%
 THROTTLE_RT_THRESHOLD = 0.05   # accelerator more than 5%
 
+# Lane-change detection for TCLC / ECL (paper gives one-line definitions)
+LANE_CHANGE_CENTER_TOL_M = 0.3   # "centred in the new lane"
+# HFCS steering power band (Li et al. 2023, Table II)
+HFCS_BAND_HZ = (0.3, 0.6)
+
 # ═══════════════════════════════════════════════════════════════
 # PCA loading weights — Li et al. (2023) Table III
 # Format: {metric_name: loading_weight}
@@ -263,6 +268,29 @@ def _optional_array(rows: list[dict], key: str):
         return None
 
 
+def _detect_lane_change(lane_ids, lane_offsets_abs, n: int):
+    """Return ``(start_idx, done_idx)`` for the first lane change, or ``None``.
+
+    A lane change starts at the first sample whose CARLA waypoint ``lane_id``
+    differs from the previous sample, and is considered complete when the
+    vehicle is back within :data:`LANE_CHANGE_CENTER_TOL_M` of the new lane
+    centre. ``lane_ids`` is ``None`` for legacy CSVs (no detection).
+    """
+    if lane_ids is None or n < 2:
+        return None
+    start = None
+    for i in range(1, n):
+        if lane_ids[i] >= 0 and lane_ids[i - 1] >= 0 and lane_ids[i] != lane_ids[i - 1]:
+            start = i
+            break
+    if start is None:
+        return None
+    for j in range(start, n):
+        if abs(lane_offsets_abs[j]) <= LANE_CHANGE_CENTER_TOL_M:
+            return (start, j)
+    return (start, n - 1)
+
+
 def compute_raw_metrics(rows: list[dict], tor_ts: float | None) -> dict:
     """Compute the 41 raw objective metrics from telemetry rows.
 
@@ -355,36 +383,53 @@ def compute_raw_metrics(rows: list[dict], tor_ts: float | None) -> dict:
         vel_lat = acc_lat * np.mean(dt) if n > 1 else np.zeros(n)
 
     # ── Lane-based metrics ──
-    lane_offsets = []
-    lane_widths = []
-    carla_map = None
-    try:
-        carla_map = ctx["world"].get_map()
-    except Exception:
-        pass
+    # Prefer the geometry stored at record time (reproducible offline); fall
+    # back to querying the CARLA map when only loc_x/loc_y are available.
+    stored_off = _optional_array(post_tor, "lane_offset_signed_m")
+    stored_width = _optional_array(post_tor, "lane_width_m")
+    lane_ids = _optional_array(post_tor, "lane_id")
 
-    if carla_map is not None:
-        for r in post_tor:
-            try:
-                loc = carla.Location(x=r.get("loc_x", 0), y=r.get("loc_y", 0))
-                wp = carla_map.get_waypoint(
-                    loc, project_to_road=True, lane_type=carla.LaneType.Driving,
-                )
-                if wp:
-                    offset = loc.distance(wp.transform.location)
-                    lane_offsets.append(float(offset))
-                    lane_widths.append(float(wp.lane_width))
-                else:
-                    lane_offsets.append(0.0)
-                    lane_widths.append(3.5)
-            except Exception:
-                lane_offsets.append(0.0)
-                lane_widths.append(3.5)
+    use_stored = (
+        stored_off is not None
+        and stored_width is not None
+        and bool(np.all(np.abs(stored_off) < 900.0))
+        and bool(np.all(np.abs(stored_width) < 900.0))
+    )
+
+    if use_stored:
+        lane_offsets_signed = stored_off
+        lane_widths = [float(w) for w in stored_width]
     else:
-        lane_offsets = [0.0] * n
-        lane_widths = [3.5] * n
+        lane_offsets_signed = np.zeros(n)
+        lane_widths = []
+        carla_map = None
+        try:
+            carla_map = ctx["world"].get_map()
+        except Exception:
+            pass
+        if carla_map is not None:
+            offs: list[float] = []
+            for r in post_tor:
+                try:
+                    loc = carla.Location(x=r.get("loc_x", 0), y=r.get("loc_y", 0))
+                    wp = carla_map.get_waypoint(
+                        loc, project_to_road=True, lane_type=carla.LaneType.Driving,
+                    )
+                    if wp:
+                        offs.append(float(loc.distance(wp.transform.location)))
+                        lane_widths.append(float(wp.lane_width))
+                    else:
+                        offs.append(0.0)
+                        lane_widths.append(3.5)
+                except Exception:
+                    offs.append(0.0)
+                    lane_widths.append(3.5)
+            lane_offsets_signed = np.array(offs)
+        else:
+            lane_widths = [3.5] * n
 
-    lane_offsets_arr = np.array(lane_offsets)
+    lane_offsets = list(np.abs(lane_offsets_signed))
+    lane_offsets_arr = np.abs(lane_offsets_signed)
 
     # ── Metric values ──
     m = get_default_metrics()
@@ -466,8 +511,17 @@ def compute_raw_metrics(rows: list[dict], tor_ts: float | None) -> dict:
     else:
         m["MRLD"] = round(float(np.min(dist_m)), 3)
 
-    # 34. HFCS — deferred (needs rolling FFT buffer)
-    m["HFCS"] = 0.0
+    # 34. HFCS — steering power in the 0.3-0.6 Hz band / total steering power
+    if n >= 8:
+        sample_dt = float(np.mean(dt))
+        if sample_dt > 0:
+            centred = steer_norm - float(np.mean(steer_norm))
+            freqs = np.fft.rfftfreq(n, d=sample_dt)
+            power = np.abs(np.fft.rfft(centred)) ** 2
+            band = (freqs >= HFCS_BAND_HZ[0]) & (freqs <= HFCS_BAND_HZ[1])
+            total_power = float(power[1:].sum())  # exclude DC
+            if total_power > 0:
+                m["HFCS"] = round(float(power[band].sum()) / total_power, 4)
 
     # 35. TTC (min after TOR)
     valid_mask = ttc_vals < 998
@@ -493,13 +547,22 @@ def compute_raw_metrics(rows: list[dict], tor_ts: float | None) -> dict:
                 tlc_vals.append(dist_to_edge / abs(vel_lat[i]))
     m["TLC"] = round(float(min(tlc_vals)), 3) if tlc_vals else 999.0
 
-    # 38. TCLC — deferred (needs lane-change detection)
-    m["TCLC"] = 0.0
+    # 38-40. Lane change → TCLC and the post-lane-change ECL window
+    lc = _detect_lane_change(lane_ids, lane_offsets_arr, n)
+    if lc is not None:
+        start_i, done_i = lc
+        m["TCLC"] = round(float(timestamps[done_i] - timestamps[start_i]), 3)
+        ecl_window = lane_offsets_arr[done_i:]
+    else:
+        # No lane change detected: TCLC is undefined (0) and ECL falls back to
+        # the full post-TOR window. Documented in the metric audit.
+        m["TCLC"] = 0.0
+        ecl_window = lane_offsets_arr
+    m["ECLmax"] = round(float(np.max(ecl_window)), 3) if len(ecl_window) else 0.0
+    m["ECLmean"] = round(float(np.mean(ecl_window)), 3) if len(ecl_window) else 0.0
 
-    # 39-41. Lane centre error and lateral position (approx, waypoint-based)
-    m["ECLmax"] = round(float(np.max(lane_offsets_arr)), 3)
-    m["ECLmean"] = round(float(np.mean(lane_offsets_arr)), 3)
-    m["SDLP"] = round(float(np.std(lane_offsets_arr)), 3)
+    # 41. SDLP — SD of the signed lateral position (relative to lane centre)
+    m["SDLP"] = round(float(np.std(lane_offsets_signed)), 3)
 
     return m
 

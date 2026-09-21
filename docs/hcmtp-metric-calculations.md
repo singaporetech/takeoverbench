@@ -52,14 +52,14 @@ This document states exactly how each of the 41 HCMTP metrics is calculated in T
 | 31 | LoAmean | m/s^2 | Mean longitudinal acceleration after the TOR. | mean(abs(acc_fwd)) | Longitudinal accel = CARLA get_acceleration() forward projection (planned). Current code uses d(speed)/dt. | OK |
 | 32 | LoASD | m/s^2 | The standard deviation of the longitudinal acceleration after the TOR. | std(acc_fwd) | Longitudinal accel = CARLA get_acceleration() forward projection (planned). Current code uses d(speed)/dt. | OK |
 | 33 | MRLD | m | The minimum relative longitudinal distance between the ego vehicle and other vehicles after the TOR. | min(abs(lead_long_m)) = longitudinal gap to lead | Longitudinal gap = (lead-ego) projected on ego forward axis (planned). Current code uses Euclidean distance. | OK |
-| 34 | HFCS | unitless | The ratio between the power of the high frequency component (0.3-0.6 Hz) of the steering wheel angle and all the other steering activities after the TOR. | 0.0 (hardcoded) | Steering power in 0.3-0.6 Hz band / total steering power. Not implemented. | DEFERRED |
+| 34 | HFCS | unitless | The ratio between the power of the high frequency component (0.3-0.6 Hz) of the steering wheel angle and all the other steering activities after the TOR. | FFT: power in 0.3-0.6 Hz band / total steering power | Band 0.3-0.6 Hz per Table II; steering signal mean-centred, DC excluded. | OK-ASSUMED |
 | 35 | TTC | s | Minimum time to collision after the TOR. | longitudinal gap / closing speed (min after TOR) | Gap = lead position projected on ego forward axis; closing speed = ego speed - lead speed. | OK |
 | 36 | DTC | m | Minimum distance to collision after the TOR. | lead_long at the min-TTC sample | Distance at the min-TTC sample (planned). Current code = min_TTC x mean speed. | OK |
 | 37 | TLC | s | Minimum time to lane crossing after the TOR. | min(dist_to_edge / \|lateral velocity\|) using measured lateral velocity | min(distance_to_edge / \|lateral velocity\|); depends on the lateral-velocity definition. | OK-ASSUMED |
-| 38 | TCLC | s | Time to complete a lane change. | 0.0 (hardcoded) | Time from lane_id change to settle. Not implemented. | DEFERRED |
-| 39 | ECLmax | m | Maximum error from the center of the lane after the lane change. | max(lane_offsets) over all post-TOR rows | Lane-centre error from CARLA waypoint centre (approx on curves). Window = after lane change (planned). | BUG |
-| 40 | ECLmean | m | Mean error from the center of the lane after the lane change. | mean(lane_offsets) over all post-TOR rows | Lane-centre error from CARLA waypoint centre (approx on curves). Window = after lane change (planned). | BUG |
-| 41 | SDLP | m | The standard deviation of the lateral position after the TOR. | std(lane_offsets) where offset = abs(distance) | Signed lateral offset from waypoint centre (assumption; current code uses absolute offset). | DECIDE |
+| 38 | TCLC | s | Time to complete a lane change. | t(centred in new lane) - t(lane_id change) | Lane change operationalised via CARLA lane_id transitions; complete when \|offset\| <= 0.3 m. 0 if no lane change. | OK-ASSUMED |
+| 39 | ECLmax | m | Maximum error from the center of the lane after the lane change. | max \|lane offset\| from lane-change completion to run end | Window = after the lane change completes; falls back to post-TOR when no lane change is detected. | OK-ASSUMED |
+| 40 | ECLmean | m | Mean error from the center of the lane after the lane change. | mean \|lane offset\| from lane-change completion to run end | Same window as ECLmax. | OK-ASSUMED |
+| 41 | SDLP | m | The standard deviation of the lateral position after the TOR. | std(signed lateral position relative to lane centre) | Signed offset (decision); lane centre from the CARLA waypoint. | OK-ASSUMED |
 
 ## Status legend
 

@@ -103,6 +103,7 @@ def stop_recording_and_save() -> tuple | None:
                   "acc_x", "acc_y", "acc_z",
                   "ang_vel_x", "ang_vel_y", "ang_vel_z",
                   "lead_long_m", "lead_lat_m",
+                  "lane_id", "road_id", "lane_width_m", "lane_offset_signed_m",
                   "post_tor"]
 
     extra_columns = metric_order + [f"pc{i}" for i in range(1, 10)]

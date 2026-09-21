@@ -9,6 +9,8 @@ import logging
 import math
 import time
 
+import carla
+
 from .constants import TELEMETRY_INTERVAL_S, ExperimentPhase
 from .state import ctx, state, state_lock
 from .summary import build_run_summary
@@ -133,6 +135,30 @@ def telemetry_loop() -> None:
                     lead_long_m = rel_x * cos_y + rel_y * sin_y
                     lead_lat_m = -rel_x * sin_y + rel_y * cos_y
 
+                # Lane geometry, stored so lane metrics are reproducible offline.
+                lane_id = -1
+                road_id = -1
+                lane_width_m = 999.0
+                lane_offset_signed_m = 999.0
+                if ctx["world"] is not None:
+                    try:
+                        wp = ctx["world"].get_map().get_waypoint(
+                            loc, project_to_road=True, lane_type=carla.LaneType.Driving
+                        )
+                        if wp is not None:
+                            lane_id = int(wp.lane_id)
+                            road_id = int(wp.road_id)
+                            lane_width_m = round(float(wp.lane_width), 3)
+                            wp_yaw = math.radians(wp.transform.rotation.yaw)
+                            rel_x = loc.x - wp.transform.location.x
+                            rel_y = loc.y - wp.transform.location.y
+                            # Signed offset along the lane's right-hand vector.
+                            lane_offset_signed_m = round(
+                                rel_x * math.sin(wp_yaw) - rel_y * math.cos(wp_yaw), 3
+                            )
+                    except Exception:
+                        logger.debug("Lane waypoint lookup failed", exc_info=True)
+
                 row = {
                     "timestamp": round(time.time(), 3),
                     "speed_ms":  round(speed_ms, 3),
@@ -157,6 +183,10 @@ def telemetry_loop() -> None:
                     "ang_vel_z": round(ang_vel.z, 4),
                     "lead_long_m": round(lead_long_m, 2),
                     "lead_lat_m": round(lead_lat_m, 2),
+                    "lane_id": lane_id,
+                    "road_id": road_id,
+                    "lane_width_m": lane_width_m,
+                    "lane_offset_signed_m": lane_offset_signed_m,
                     "post_tor": 1 if state.get("tor_timestamp") is not None else 0,
                 }
 
