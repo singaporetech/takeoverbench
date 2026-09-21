@@ -209,7 +209,7 @@ PC_NAMES: list[dict[str, Any]] = [
         "ideal": "-0.3",
         "pos_elevated": "Accelerated side-to-side displacement vectors",
         "neg_elevated": "Sluggish lateral transitions",
-        "pos_critical": "Severe lateral swerving (loss of transient state)"
+        "neg_critical": "Severe lateral swerving (loss of transient state)"
     },
 ]
 
@@ -340,6 +340,15 @@ def generate_session_report(session_runs: list[dict], hardware_config: dict, out
         p(f"<b>Participant ID:</b> {session_runs[0].get('participant_id', 'Unknown')}", normal_style),
         p(f"<b>Scenario Set:</b> {session_runs[0].get('scenario_set', 'Custom')}", normal_style),
         p(f"<b>Total Runs Completed:</b> {len(session_runs)}", normal_style),
+        sp(3),
+        p("PRELIMINARY RESULTS", h2_style),
+        p(
+            "PC scores are preliminary. Metrics follow Li et al. (2023), Tables II and III; "
+            "where the paper is silent we apply the assumptions documented in "
+            "<i>docs/hcmtp-metric-calculations.md</i> and the metric audit CSV. Scores are "
+            "standardised against the per-preset baseline and are only comparable within a preset.",
+            normal_style,
+        ),
         sp(4),
     ]
 

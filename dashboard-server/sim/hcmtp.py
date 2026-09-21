@@ -10,6 +10,7 @@ confidence levels for each metric.
 """
 
 import logging
+from pathlib import Path
 
 import carla
 import numpy as np
@@ -183,20 +184,28 @@ class Standardizer:
         self.calibrated = False
 
     @classmethod
-    def from_file(cls, path: str = "calibration.json") -> "dict | None":
+    def from_file(cls, path: "str | Path | None" = None) -> "dict | None":
         """Load Standardizers from a JSON calibration file.
 
-        Supports both flat (``{"means": ..., "stds": ...}``) and per-preset
-        (``{"1": {"means": ..., "stds": ...}}``) formats.
+        ``path`` defaults to ``dashboard-server/calibration.json`` and any
+        relative path is resolved against the project root — **not** the
+        working directory, so the server behaves the same however it is
+        launched.
 
-        Returns a dict ``{preset_id: Standardizer}`` or ``None``.
+        Supports both flat (``{"means": ...}``) and per-preset
+        (``{"1": {"means": ...}}``) formats. Returns
+        ``{preset_id: Standardizer}`` or ``None``.
         """
         import json
-        import os
-        if not os.path.isfile(path):
+
+        project_root = Path(__file__).resolve().parent.parent
+        cal_path = Path(path) if path is not None else project_root / "calibration.json"
+        if not cal_path.is_absolute():
+            cal_path = project_root / cal_path
+        if not cal_path.is_file():
             return None
         try:
-            with open(path) as f:
+            with cal_path.open() as f:
                 data = json.load(f)
 
             result: dict[str, "Standardizer"] = {}
@@ -210,8 +219,10 @@ class Standardizer:
                 obj.calibrated = True
                 result["0"] = obj
             else:
-                # Per-preset format
+                # Per-preset format (skip provenance/metadata entries)
                 for preset_id, info in data.items():
+                    if not isinstance(info, dict) or "means" not in info or "stds" not in info:
+                        continue
                     obj = cls()
                     obj.means = {k: float(v) for k, v in info["means"].items()}
                     obj.stds = {k: float(v) for k, v in info["stds"].items()}

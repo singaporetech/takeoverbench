@@ -184,6 +184,31 @@ def test_lane_change_tclc_and_ecl_window():
     assert m["SDLP"] == round(statistics.pstdev(offsets), 3)
 
 
+def test_standardizer_skips_provenance(tmp_path):
+    import json
+
+    from sim.hcmtp import Standardizer
+
+    path = tmp_path / "cal.json"
+    path.write_text(json.dumps({
+        "1": {
+            "name": "Preset 1", "n": 2, "sources": ["s"],
+            "means": {"RTS": 1.0}, "stds": {"RTS": 0.5},
+        },
+        "_provenance": {"commit": "abc", "generated_at": "now"},
+    }))
+    stdizers = Standardizer.from_file(str(path))
+    assert stdizers is not None
+    assert set(stdizers) == {"1"}
+    assert stdizers["1"].means["RTS"] == 1.0
+
+
+def test_standardizer_missing_file(tmp_path):
+    from sim.hcmtp import Standardizer
+
+    assert Standardizer.from_file(str(tmp_path / "nope.json")) is None
+
+
 def test_legacy_rows_still_compute():
     # Old CSVs have none of the raw signal columns; must not crash.
     legacy = [
