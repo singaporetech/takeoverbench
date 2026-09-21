@@ -13,7 +13,7 @@
 <!-- TOPBAR — 4 solid color badges      -->
 <!-- ════════════════════════════════════ -->
 <div class="topbar">
-  <div class="logo">TAKEOVER<span>BENCH</span><span class="logo-tag">SAE J3016-2021</span></div>
+  <div class="logo">TAKEOVER<span>BENCH</span></div>
   <div class="topbar-right">
     <span class="badge badge-blue"  id="lbl-participant">ID: --</span>
     <span class="badge badge-green" id="lbl-carla">CARLA DISCONNECTED</span>
@@ -60,6 +60,8 @@
       <button class="btn btn-start" id="btn-start" onclick="startScenario()">Start Scenario</button>
       <button class="btn btn-report" id="btn-pdf" onclick="downloadReport()" disabled
               title="Available after at least one scenario run completes">Session Report</button>
+      <!-- Evaluator-facing run status (the participant is cued inside CARLA) -->
+      <div class="run-status" id="run-status"></div>
     </div>
 
     <!-- CARD 3: Active Scenario -->

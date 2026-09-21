@@ -12,6 +12,7 @@ let activePresetIndex = 0;
 let sessionRunCount = 0;
 let activeSetId = null;
 let activeSetName = null;
+let runHadSet = false;   // was a scenario set active when this run started?
 
 function updateCarlaStatus(connected) {
   isCarlaConnected = connected;
@@ -97,6 +98,7 @@ function syncScenarioState(data) {
   document.getElementById('lbl-rec').textContent = 'RECORDING';
 
   showVideoFeed();
+  setRunStatus('');
   startPolling();
   addLog('Reconnected to running run: ' + data.run_id, 'ok');
 }
@@ -110,6 +112,8 @@ async function startScenario() {
   startBtn.disabled = true;
   startBtn.textContent = 'STARTING...';
   document.getElementById('next-card').classList.remove('visible');
+  setRunStatus('');
+  runHadSet = (activeSetId !== null) || (queuedIds.length > 0);
   torShown = false;
 
   // BUG-03 fix: wrap in try/catch so network errors don't permanently disable the button
@@ -222,8 +226,14 @@ async function pollStatus() {
       // Reset autopilot badge
       setControlMode('idle');
 
-      // Hide video feed
-      hideVideoFeed();
+      // Evaluator-facing status (the participant is cued inside CARLA).
+      if (data.next_preset && data.next_preset.name) {
+        setRunStatus('Run complete · next: ' + data.next_preset.name, 'ok');
+      } else if (runHadSet) {
+        setRunStatus('Set complete · Session Report ready', 'ok');
+      } else {
+        setRunStatus('Run complete', 'ok');
+      }
 
       addLog('Scenario ended', 'ok');
     }

@@ -25,6 +25,10 @@ MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 # Port kill behaviour: ask | kill | skip
 MQTT_PORT_KILL_MODE = os.getenv("MQTT_PORT_KILL_MODE", "ask")
 
+# URL encoded in the QR code printed on session reports. Leave empty to
+# auto-use this server's /download-report endpoint on the LAN.
+REPORT_QR_URL = os.getenv("REPORT_QR_URL", "")
+
 # Output directory for telemetry CSVs
 RUNS_DIR = Path(__file__).resolve().parent / "runs"
 RUNS_DIR.mkdir(exist_ok=True)

@@ -14,6 +14,7 @@ PRESETS: list[dict[str, Any]] = [
     {
         "id": 0,
         "name": "Training Familiarization",
+        "description": "Warm-up run. The car drives itself and asks you to take over once so you can get used to the controls. This run is not recorded.",
         "map": "Town06",
         "vehicle_id": "vehicle.tesla.model3",
         "speed_kmh": 60,
@@ -29,6 +30,7 @@ PRESETS: list[dict[str, Any]] = [
     {
         "id": 1,
         "name": "Easy Highway",
+        "description": "80 km/h cruise. A stationary vehicle ahead triggers a takeover request at a 3 s time-to-collision. The gentlest of the recorded conditions.",
         "map": "Town06",
         "vehicle_id": "vehicle.tesla.model3",
         "speed_kmh": 80,
@@ -44,6 +46,7 @@ PRESETS: list[dict[str, Any]] = [
     {
         "id": 2,
         "name": "Moderate Highway",
+        "description": "90 km/h cruise with the obstacle further ahead. A representative everyday takeover condition.",
         "map": "Town06",
         "vehicle_id": "vehicle.tesla.model3",
         "speed_kmh": 90,
@@ -59,6 +62,7 @@ PRESETS: list[dict[str, Any]] = [
     {
         "id": 3,
         "name": "Hard Highway",
+        "description": "100 km/h cruise with a late, high-speed takeover request. The most demanding condition in the set.",
         "map": "Town06",
         "vehicle_id": "vehicle.tesla.model3",
         "speed_kmh": 100,
@@ -74,6 +78,7 @@ PRESETS: list[dict[str, Any]] = [
     {
         "id": 4,
         "name": "Adverse Rain",
+        "description": "80 km/h in heavy rain: reduced visibility and grip.",
         "map": "Town06",
         "vehicle_id": "vehicle.tesla.model3",
         "speed_kmh": 80,
@@ -89,6 +94,7 @@ PRESETS: list[dict[str, Any]] = [
     {
         "id": 5,
         "name": "Adverse Sunset",
+        "description": "80 km/h at sunset: low sun and glare.",
         "map": "Town06",
         "vehicle_id": "vehicle.tesla.model3",
         "speed_kmh": 80,
@@ -105,6 +111,12 @@ PRESETS: list[dict[str, Any]] = [
 
 # ── Built-in scenario sets ──
 BUILTIN_SETS = [
+    {
+        "id": "demo_three",
+        "name": "Demo — Three Scenarios",
+        "estimated_minutes": 4,
+        "preset_ids": [0, 2, 3],
+    },
     {
         "id": "standard_full",
         "name": "Set A — Standard Protocol",

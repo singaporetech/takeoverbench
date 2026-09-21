@@ -109,6 +109,7 @@ function renderQueue() {
       + '<div class="timeline-meta">'
       + 'TTC: ' + (p ? p.tor_ttc : '--') + ' · Obstacle: ' + (p ? p.obstacle_distance : '--')
       + '</div>'
+      + (p && p.description ? '<div class="timeline-desc">' + p.description + '</div>' : '')
       + '</div>'
       + '</div>';
     return html;
@@ -116,13 +117,24 @@ function renderQueue() {
 }
 
 function updateActiveScenarioInfo(preset) {
-  document.getElementById('active-scenario-info').innerHTML =
-    'Name: ' + preset.name + '<br>'
+  var desc = preset.description
+    ? '<div class="scenario-desc">' + preset.description + '</div>'
+    : '';
+  document.getElementById('active-scenario-info').innerHTML = desc
+    + 'Name: ' + preset.name + '<br>'
     + 'Speed: ' + preset.speed_kmh + ' km/h<br>'
     + 'TTC Threshold: ' + preset.tor_ttc + ' s<br>'
     + 'Obstacle: ' + preset.obstacle_distance + ' m<br>'
     + 'Weather: ' + preset.weather + '<br>'
     + 'SAE Level: ' + preset.sae_level;
+}
+
+// Evaluator-facing run status. (The participant is cued inside CARLA.)
+function setRunStatus(text, kind) {
+  const el = document.getElementById('run-status');
+  if (!el) return;
+  el.textContent = text || '';
+  el.className = 'run-status' + (kind ? ' ' + kind : '');
 }
 
 function renderHardwareScores(hw) {
@@ -164,6 +176,9 @@ function renderCountdown(data) {
   if (!cd) return;
   if (data.tor_phase === 'coasting' && data.tor_countdown_s > 0) {
     cd.textContent = 'Countdown: ' + data.tor_countdown_s.toFixed(1) + 's';
+    cd.style.display = '';
+  } else if (data.tor_phase === 'stopping') {
+    cd.textContent = 'Stopping…';
     cd.style.display = '';
   } else if (data.tor_phase === 'auto_ended') {
     cd.textContent = 'Scenario Ended';
