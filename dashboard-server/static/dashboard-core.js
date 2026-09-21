@@ -171,6 +171,23 @@ function downloadReport() {
     });
 }
 
+// ── Results link (report QR target) ──
+async function saveQrUrl() {
+  const el = document.getElementById('qr-url-input');
+  const url = el ? el.value.trim() : '';
+  try {
+    const res = await fetch('/set-qr-url', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({url: url})
+    });
+    const data = await res.json();
+    if (el) el.value = data.results_url || '';
+    setRunStatus('Results link saved · ' + (data.results_url || ''), 'ok');
+  } catch (e) {
+    setRunStatus('Could not save results link', '');
+  }
+}
+
 // ── Polling ──
 function startPolling() {
   if (pollTimer) clearInterval(pollTimer);
@@ -328,6 +345,9 @@ async function initDashboard() {
 
     renderParticipantID(data.participant_id);
     renderPhaseBadge(data.experiment_phase);
+
+    const qrInput = document.getElementById('qr-url-input');
+    if (qrInput && data.results_url) qrInput.value = data.results_url;
 
     if (data.active_set_id !== undefined) {
       activeSetId = data.active_set_id || null;

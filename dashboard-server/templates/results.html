@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TakeoverBench — Results</title>
+<style>
+  :root {
+    --bg:#f6f7f9; --surface:#fff; --text:#0f172a; --dim:#64748b;
+    --border:#e2e8f0; --accent:#2563eb;
+    --ok:#16a34a; --warn:#d97706; --danger:#dc2626;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body {
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    padding:20px 16px 48px; line-height:1.5;
+  }
+  .wrap { max-width:820px; margin:0 auto; }
+  .brand { font-weight:700; letter-spacing:.08em; color:var(--accent); font-size:14px; }
+  h1 { font-size:24px; margin:6px 0 2px; }
+  .sub { color:var(--dim); font-size:14px; margin-bottom:18px; }
+  .meta { background:var(--surface); border:1px solid var(--border); border-radius:10px;
+          padding:14px 16px; margin-bottom:18px; font-size:15px; }
+  .meta div { margin:2px 0; }
+  .meta b { color:var(--dim); font-weight:600; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:10px;
+          padding:4px 0; overflow-x:auto; margin-bottom:18px; }
+  table { width:100%; border-collapse:collapse; font-size:14px; min-width:640px; }
+  th, td { padding:9px 10px; text-align:center; white-space:nowrap; }
+  th { color:var(--dim); font-weight:600; border-bottom:1px solid var(--border); }
+  td:first-child, th:first-child { text-align:left; }
+  tbody tr { border-bottom:1px solid var(--border); }
+  tbody tr:last-child { border-bottom:none; }
+  .nominal { color:var(--ok); font-weight:600; }
+  .suboptimal { color:var(--warn); font-weight:600; }
+  .danger { color:var(--danger); font-weight:700; }
+  .none { color:var(--dim); }
+  .legend { display:flex; gap:16px; flex-wrap:wrap; font-size:13px; color:var(--dim); margin-bottom:18px; }
+  .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; }
+  .empty { background:var(--surface); border:1px dashed var(--border); border-radius:10px;
+           padding:28px; text-align:center; color:var(--dim); }
+  .btn { display:inline-block; background:var(--accent); color:#fff; text-decoration:none;
+         padding:12px 20px; border-radius:8px; font-weight:600; font-size:15px; }
+  .btn:active { opacity:.85; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand">TAKEOVERBENCH</div>
+  <h1>Session Results</h1>
+  <div class="sub">Human-Centred Comprehensive Measure of Take-Over Performance (HCMTP)</div>
+
+  <div class="meta">
+    <div><b>Participant:</b> {{ participant_id or '—' }}</div>
+    <div><b>Scenario set:</b> {{ set_name or '—' }}</div>
+    <div><b>Runs completed:</b> {{ rows|length }}</div>
+  </div>
+
+  {% if has_runs %}
+  <div class="legend">
+    <span><span class="dot" style="background:#16a34a"></span>Nominal</span>
+    <span><span class="dot" style="background:#d97706"></span>Suboptimal</span>
+    <span><span class="dot" style="background:#dc2626"></span>Critical</span>
+  </div>
+
+  <div class="card">
+    <table>
+      <thead>
+        <tr>
+          <th>Run</th>
+          {% for name in pc_names %}<th>{{ name.split('—')[0].strip() }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td>{{ r.run }}</td>
+          {% for c in r.cells %}
+          <td class="{{ c.status }}">{{ c.value if c.value is not none else '—' }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <a class="btn" href="/download-report">Download full PDF report</a>
+  {% else %}
+  <div class="empty">No results yet. Please ask the researcher.</div>
+  {% endif %}
+</div>
+</body>
+</html>

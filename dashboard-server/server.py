@@ -188,6 +188,7 @@ def status():
             "next_preset":         _get_next_preset(s),
             "experiment_phase":    s.get("experiment_phase", ExperimentPhase.IDLE),
             "hmi_connected":       s.get("hmi_connected", False),
+            "results_url":         config.results_url(),
         })
 
 def _get_next_preset(state):
@@ -557,6 +558,61 @@ def event_log():
 
 
 # ─────────────────────────────────────────
+# RESULTS PAGE (QR target on the session report)
+# ─────────────────────────────────────────
+@app.route("/results")
+def results():
+    """Mobile-friendly results page participants can scan to reach."""
+    from sim.report import PC_NAMES, PC_TARGETS, check_danger
+
+    with runner.state_lock:
+        runs = list(runner.state.get("session_runs", []))
+        pid = runner.state.get("participant_id", "")
+        set_name = runner.state.get("active_set_name") or runner.state.get("active_set_id") or ""
+
+    pc_keys = [f"pc{i}" for i in range(1, 10)]
+    rows = []
+    for rs in runs:
+        cells = []
+        for i, k in enumerate(pc_keys):
+            v = rs.get(k)
+            if v is None:
+                cells.append({"value": None, "status": "none"})
+                continue
+            lo, hi = PC_TARGETS[i]
+            if check_danger(i, v):
+                status = "danger"
+            elif lo <= v <= hi:
+                status = "nominal"
+            else:
+                status = "suboptimal"
+            cells.append({"value": f"{v:+.2f}", "status": status})
+        rows.append({"run": rs.get("run_number", len(rows) + 1), "cells": cells})
+
+    return render_template(
+        "results.html",
+        rows=rows,
+        pc_names=[p["name"] for p in PC_NAMES],
+        participant_id=pid,
+        set_name=set_name,
+        has_runs=bool(runs),
+    )
+
+
+@app.route("/set-qr-url", methods=["POST"])
+def set_qr_url():
+    """Set the runtime results URL encoded in the report QR code.
+
+    Lets the evaluator paste a working URL (e.g. an ngrok/cloudflared tunnel)
+    without restarting the server.
+    """
+    data = request.get_json(silent=True) or {}
+    active = config.set_qr_url(data.get("url", ""))
+    _log(f"Results QR URL: {active or '(auto)'}", "ok")
+    return jsonify({"status": "ok", "results_url": active})
+
+
+# ─────────────────────────────────────────
 # PDF REPORT
 # ─────────────────────────────────────────
 @app.route("/download-report")
@@ -623,6 +679,7 @@ if __name__ == "__main__":
     print("=" * 50)
     print("  TakeoverBench Server")
     print("=" * 50)
+    print(f"  Results page (report QR target): {config.results_url()}")
 
     # Free MQTT port
     ensure_port_free(config.MQTT_HOST, config.MQTT_PORT,

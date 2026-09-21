@@ -46,42 +46,26 @@ LOGO_PATH = str(_THIS_DIR.parent / "static" / "icons" / "logo.svg")
 LOGO_WIDTH = 118 * mm
 LOGO_HEIGHT = 13 * mm
 
-
-def _lan_ip() -> str:
-    """Best-effort local LAN IP for QR links (falls back to loopback)."""
-    import socket
-
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
-            s.connect(("8.8.8.8", 80))
-            return s.getsockname()[0]
-    except Exception:
-        return "127.0.0.1"
+# Number of participants in the calibration baseline, shown on the report.
+# Update if the baseline changes.
+CALIBRATION_PARTICIPANTS = 20
 
 
 def _report_qr_url() -> str:
-    """Return the URL encoded in the report QR code.
-
-    Uses ``REPORT_QR_URL`` from config when set, otherwise the dashboard's
-    ``/download-report`` endpoint on the LAN, so participants can scan and
-    save a copy while the server is running.
-    """
+    """Return the URL encoded in the report QR code (the results page)."""
     try:
         import config
+        return config.results_url()
     except Exception:
         return ""
-    explicit = getattr(config, "REPORT_QR_URL", "")
-    if explicit:
-        return explicit
-    host = getattr(config, "FLASK_HOST", "127.0.0.1")
-    port = getattr(config, "FLASK_PORT", 5000)
-    if host in ("", "0.0.0.0", "::"):
-        host = _lan_ip()
-    return f"http://{host}:{port}/download-report"
 
 
-def _draw_qr(canvas: Any, doc: Any, url: str, size_mm: float = 26.0) -> None:
-    """Draw a QR code in the top-right corner of the current PDF page."""
+def _draw_qr(canvas: Any, doc: Any, url: str, size_mm: float = 16.0) -> None:
+    """Draw a QR code + caption inside the top margin of a PDF page.
+
+    Sitting in the margin means it appears on every page without overlapping
+    any content.
+    """
     if not url:
         return
     try:
@@ -91,9 +75,19 @@ def _draw_qr(canvas: Any, doc: Any, url: str, size_mm: float = 26.0) -> None:
         bw, bh = bounds[2] - bounds[0], bounds[3] - bounds[1]
         drawing = Drawing(size, size, transform=[size / bw, 0, 0, size / bh, 0, 0])
         drawing.add(qr)
-        x = doc.pagesize[0] - doc.rightMargin - size
-        y = doc.pagesize[1] - doc.topMargin - size
+        page_w, page_h = doc.pagesize
+        x = page_w - doc.rightMargin - size
+        y = page_h - doc.topMargin + max(0.0, (doc.topMargin - size) / 2.0)
         renderPDF.draw(drawing, canvas, x, y)
+
+        # Caption to the left of the QR, vertically centred on it.
+        canvas.saveState()
+        canvas.setFont("Helvetica", 7.5)
+        canvas.setFillColor(C_SECONDARY)
+        caption = "Scan here to see the results"
+        text_w = canvas.stringWidth(caption, "Helvetica", 7.5)
+        canvas.drawString(x - 4 * mm - text_w, y + size / 2 - 2.4, caption)
+        canvas.restoreState()
     except Exception:
         pass
 
@@ -334,7 +328,7 @@ def generate_session_report(session_runs: list[dict], hardware_config: dict, out
 
     path = os.path.join(str(output_dir), "session_report.pdf") if output_dir else tempfile.mkstemp(suffix=".pdf", prefix="takeoverbench_session_")[1]
 
-    doc = SimpleDocTemplate(path, topMargin=20*mm, bottomMargin=25*mm, leftMargin=20*mm, rightMargin=20*mm)
+    doc = SimpleDocTemplate(path, topMargin=24*mm, bottomMargin=25*mm, leftMargin=20*mm, rightMargin=20*mm)
     
     # Custom Typography Styles
     styles = getSampleStyleSheet()
@@ -396,22 +390,20 @@ def generate_session_report(session_runs: list[dict], hardware_config: dict, out
         sp(3),
         p("PRELIMINARY RESULTS", h2_style),
         p(
-            "PC scores are preliminary. Metrics follow Li et al. (2023), Tables II and III; "
-            "where the paper is silent we apply the assumptions documented in "
-            "<i>docs/hcmtp-metric-calculations.md</i> and the metric audit CSV. Scores are "
-            "standardised against the per-preset baseline and are only comparable within a preset.",
+            f"Results are preliminary, based on a calibration conducted with "
+            f"<b>{CALIBRATION_PARTICIPANTS} participants</b>. Scores are standardised against the "
+            f"per-preset baseline and are only comparable within a preset.",
             normal_style,
         ),
         p(
-            "<b>Metrics &amp; PCA framework:</b> Li, Q., Wang, Z., Wang, W., Zeng, C., Wu, C., Li, G., "
-            "Heh, J.-S., &amp; Cheng, B. (2023). A Human-Centered Comprehensive Measure of Take-Over "
-            "Performance Based on Multiple Objective Metrics. <i>IEEE T-ITS</i>, 24(4), 4235–4240. "
-            "DOI: 10.1109/TITS.2022.3233623.",
+            "<b>Metrics &amp; HCMTP</b> courtesy of the paper <i>A Human-Centered Comprehensive Measure "
+            "of Take-Over Performance Based on Multiple Objective Metrics</i>, made by Li, Q., Wang, Z., "
+            "Wang, W., Zeng, C., Wu, C., Li, G., Heh, J.-S., &amp; Cheng, B.",
             normal_style,
         ),
         p(
-            "<b>Hardware fidelity framework:</b> Wynne, R. A., Beanland, V., &amp; Salmon, P. M. (2019). "
-            "Systematic review of driving simulator validation studies. <i>Safety Science</i>, 117, 138–151.",
+            "<b>Hardware fidelity framework</b> courtesy of the paper <i>Systematic review of driving "
+            "simulator validation studies</i>, written by Wynne, R. A., Beanland, V., &amp; Salmon, P. M.",
             normal_style,
         ),
         sp(4),
@@ -648,12 +640,10 @@ def generate_session_report(session_runs: list[dict], hardware_config: dict, out
 
         canvas.restoreState()
 
-    doc.onFirstPage = _page_footer
-    def _page_first(canvas: Any, _doc: Any) -> None:
-        _page_footer(canvas, _doc)
+        # QR code in the top margin on every page.
         _draw_qr(canvas, _doc, _report_qr_url())
 
+    doc.onFirstPage = _page_footer
     doc.onLaterPages = _page_footer
-    doc.onFirstPage = _page_first
     doc.build(elems)
     return path

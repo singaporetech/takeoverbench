@@ -62,6 +62,12 @@
               title="Available after at least one scenario run completes">Session Report</button>
       <!-- Evaluator-facing run status (the participant is cued inside CARLA) -->
       <div class="run-status" id="run-status"></div>
+      <!-- Results link printed in the report QR (paste an ngrok/cloudflared URL) -->
+      <div class="qr-url-row">
+        <input class="qr-url-input" id="qr-url-input" type="text"
+               placeholder="Results link (auto: LAN address)" />
+        <button class="btn btn-small" onclick="saveQrUrl()">Save</button>
+      </div>
     </div>
 
     <!-- CARD 3: Active Scenario -->
