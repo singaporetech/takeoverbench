@@ -25,6 +25,10 @@ import carla
 
 from sim.constants import (
     CONTROLLER_INTERVAL_S,
+    CRUISE_KP,
+    HUMAN_BRAKE_DEADZONE,
+    HUMAN_STEER_DEADZONE,
+    HUMAN_THROTTLE_DEADZONE,
     PID_KI_SPEED,
     PID_KP_SPEED,
     PID_KP_STEER,
@@ -200,14 +204,55 @@ def run_controller(target_speed_kmh: float) -> None:
                     logger.debug("tick spd=%.1f/%.0f th=%.2f br=%.2f st=%.3f",
                                  current_speed, target_speed_kmh, throttle, brake, steer)
 
-            # ── Human branch (post-TOR): read steering wheel ──
+            # ── Human branch (post-TOR) ──
+            # Read the driver's input. If they have not touched anything yet,
+            # hold the speed the car had at the TOR (cruise) so the scenario
+            # cannot be passed by doing nothing. The human input is recorded
+            # separately so our cruise throttle is never read as a reaction.
             else:
                 from . import wheel
                 ctrl = wheel.read()
+                human = {"steer": 0.0, "throttle": 0.0, "brake": 0.0}
                 if ctrl is not None:
-                    ctx["vehicle"].apply_control(ctrl)
+                    human = {
+                        "steer": float(ctrl.steer),
+                        "throttle": float(ctrl.throttle),
+                        "brake": float(ctrl.brake),
+                    }
+                with state_lock:
+                    state["human_control"] = dict(human)
+                    cruise_target = state.get("cruise_target_ms")
+
+                active = (
+                    abs(human["steer"]) > HUMAN_STEER_DEADZONE
+                    or human["throttle"] > HUMAN_THROTTLE_DEADZONE
+                    or human["brake"] > HUMAN_BRAKE_DEADZONE
+                )
+
+                if active:
+                    ctx["vehicle"].apply_control(carla.VehicleControl(
+                        throttle=human["throttle"],
+                        steer=human["steer"],
+                        brake=human["brake"],
+                        reverse=False,
+                        manual_gear_shift=False,
+                    ))
+                elif cruise_target is not None:
+                    throttle = max(0.0, min(1.0, (cruise_target - current_speed) * CRUISE_KP))
+                    ctx["vehicle"].apply_control(carla.VehicleControl(
+                        throttle=throttle,
+                        steer=0.0,
+                        brake=0.0,
+                        reverse=False,
+                        manual_gear_shift=False,
+                    ))
+                else:
+                    ctx["vehicle"].apply_control(carla.VehicleControl(
+                        throttle=0.0, steer=0.0, brake=0.0, reverse=False,
+                    ))
+
                 if _tick_count % 20 == 1:
-                    logger.debug("Human %s", "wheel connected" if ctrl else "no wheel -- coasting")
+                    logger.debug("Human active=%s input=%s", active, human)
 
         except Exception as e:
             logger.error("Controller exception: %s", e, exc_info=True)

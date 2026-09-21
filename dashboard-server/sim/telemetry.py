@@ -154,6 +154,11 @@ def telemetry_loop() -> None:
                 t         = ctx["vehicle"].get_transform()
                 ttc       = _tor.calculate_ttc()
 
+                # Driver input, recorded separately from the applied control so
+                # the cruise-hold throttle is never mistaken for a reaction.
+                with state_lock:
+                    human = dict(state.get("human_control") or {})
+
                 # Relative position of the lead vehicle, projected onto the
                 # ego's body axes (forward / lateral). 999 = no lead vehicle.
                 dist_m = 999.0
@@ -200,6 +205,10 @@ def telemetry_loop() -> None:
                     "steer":     round(ctrl.steer, 4),
                     "throttle":  round(ctrl.throttle, 4),
                     "brake":     round(ctrl.brake, 4),
+                    # ── Driver input (independent of the applied control) ──
+                    "human_steer":    round(float(human.get("steer", 0.0)), 4),
+                    "human_throttle": round(float(human.get("throttle", 0.0)), 4),
+                    "human_brake":    round(float(human.get("brake", 0.0)), 4),
                     "loc_x":     round(loc.x, 2),
                     "loc_y":     round(loc.y, 2),
                     "yaw":       round(t.rotation.yaw, 2),

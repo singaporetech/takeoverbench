@@ -341,10 +341,19 @@ def compute_raw_metrics(rows: list[dict], tor_ts: float | None) -> dict:
     ang_vel_z = _optional_array(post_tor, "ang_vel_z")
     lead_long = _optional_array(post_tor, "lead_long_m")
 
+    # Driver input: use human_* when present (the applied control may be the
+    # post-TOR cruise hold). Older CSVs fall back to the applied control.
+    human_steer = _optional_array(post_tor, "human_steer")
+    human_brake = _optional_array(post_tor, "human_brake")
+    human_throttle = _optional_array(post_tor, "human_throttle")
+    driver_steer = human_steer if human_steer is not None else steer_norm
+    driver_brake = human_brake if human_brake is not None else brake_norm
+    driver_throttle = human_throttle if human_throttle is not None else throttle_norm
+
     # ── Convert to physical units ──
-    steer_deg   = steer_norm * STEER_MAX_DEG          # °
-    brake_mpa   = brake_norm * BRAKE_MAX_MPA          # MPa
-    throttle_pct = throttle_norm * THROTTLE_TO_PCT    # %
+    steer_deg   = driver_steer * STEER_MAX_DEG        # °
+    brake_mpa   = driver_brake * BRAKE_MAX_MPA        # MPa
+    throttle_pct = driver_throttle * THROTTLE_TO_PCT  # %
 
     # ── Time derivatives ──
     dt = np.diff(timestamps)
@@ -456,9 +465,9 @@ def compute_raw_metrics(rows: list[dict], tor_ts: float | None) -> dict:
         hits = np.nonzero(mask)[0]
         return float(timestamps[hits[0]] - t0) if hits.size else window_s
 
-    rts = _first_cross_after_tor(steer_norm > steer_thresh)
-    rtb = _first_cross_after_tor(brake_norm > BRAKE_RT_THRESHOLD)
-    rta = _first_cross_after_tor(throttle_norm > THROTTLE_RT_THRESHOLD)
+    rts = _first_cross_after_tor(driver_steer > steer_thresh)
+    rtb = _first_cross_after_tor(driver_brake > BRAKE_RT_THRESHOLD)
+    rta = _first_cross_after_tor(driver_throttle > THROTTLE_RT_THRESHOLD)
 
     m["RTS"] = round(rts, 3)
     m["RTB"] = round(rtb, 3)

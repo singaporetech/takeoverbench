@@ -19,20 +19,20 @@ This document states exactly how each of the 41 HCMTP metrics is calculated in T
 
 | # | Metric | Unit | Paper definition (Table II) | How the code calculates it | Our assumption | Status |
 |---|--------|------|-----------------------------|----------------------------|----------------|--------|
-| 1 | RTS | s | The time from the TOR until the driver turns the steering wheel more than 2 degrees. | first t after TOR where steer > 2 deg (steer_norm > 2/450) | Absolute 2 deg threshold (paper). Degrees via steer x450 (assumes 900 deg lock-to-lock). Window TOR->end. | OK-ASSUMED |
-| 2 | RTB | s | The time from the TOR until the driver depresses the brake pedal more than 10%. | first t after TOR where brake > 10% | Absolute 10% threshold (paper). Window TOR->end. | OK |
-| 3 | RTA | s | The time from the TOR until the driver depresses the accelerator pedal more than 5%. | first t after TOR where throttle > 5% | Absolute 5% threshold (paper). Window TOR->end. | OK |
-| 4 | RT | s | The minimum value of the RTS, RTB, and RTA. | min(RTS, RTB, RTA); a channel that never crosses is censored at the window length | Missing channels censored at the window length (not 0 s, which would be an instantaneous reaction). | OK-ASSUMED |
+| 1 | RTS | s | The time from the TOR until the driver turns the steering wheel more than 2 degrees. | first t after TOR where steer > 2 deg (steer_norm > 2/450) | Driver input (human_steer) from the TOR; absolute 2 deg threshold. Degrees via steer x450 (assumes 900 deg lock-to-lock). Window TOR->end. | OK-ASSUMED |
+| 2 | RTB | s | The time from the TOR until the driver depresses the brake pedal more than 10%. | first t after TOR where brake > 10% | Driver input (human_brake) from the TOR; absolute 10% threshold. Window TOR->end. | OK |
+| 3 | RTA | s | The time from the TOR until the driver depresses the accelerator pedal more than 5%. | first t after TOR where throttle > 5% | Driver input (human_throttle) from the TOR; absolute 5% threshold. Window TOR->end. | OK |
+| 4 | RT | s | The minimum value of the RTS, RTB, and RTA. | min(RTS, RTB, RTA); a channel that never crosses is censored at the window length | Min of the driver-input channels; a channel that never crosses is censored at the window length. | OK-ASSUMED |
 | 5 | TTBT | s | The time interval between the ego vehicle and the boundary at take-over timing. | dist_to_edge / \|lateral velocity\| at TOR (measured velocity) | Snapshot at TOR. Lane width/offset from CARLA waypoint centre; lateral velocity from projected CARLA velocity (planned). | APPROX |
-| 6 | SAmax | deg | Maximum steering wheel angle after the TOR. | max(abs(steer_deg)); steer_deg = steer*450 | Peak MAGNITUDE of steering (assumption; paper says 'maximum'). Degrees via steer x450 (assumes 900 deg lock-to-lock). Window TOR->end. | OK-ASSUMED |
-| 7 | SAmean | deg | Mean steering wheel angle after the TOR. | mean(abs(steer_deg)) | MAGNITUDE mean (assumption; paper says 'mean'). Degrees via steer x450 (assumes 900 deg lock-to-lock). | OK-ASSUMED |
-| 8 | SASD | deg | The standard deviation of the steering wheel angle after the TOR. | std(steer_deg) | SD of signed steering angle. Degrees via steer x450 (assumes 900 deg lock-to-lock). | APPROX |
-| 9 | Bmax | MPa | Maximum brake pressure after the TOR. | max(brake*5.0) | brake x5 -> MPa (assumes 5 MPa max pressure; CARLA has no brake pressure). | APPROX |
-| 10 | Bmean | MPa | Mean brake pressure after the TOR. | mean(brake*5.0) | brake x5 -> MPa (assumes 5 MPa max pressure; CARLA has no brake pressure). | APPROX |
-| 11 | BSD | MPa | The standard deviation of the brake pressure after the TOR. | std(brake*5.0) | brake x5 -> MPa (assumes 5 MPa max pressure; CARLA has no brake pressure). | APPROX |
-| 12 | Thmax | % | Maximum throttle after the TOR. | max(throttle*100) | None beyond the global window. Throttle x100 -> %. | OK |
-| 13 | Thmean | % | Mean throttle after the TOR. | mean(throttle*100) | None beyond the global window. Throttle x100 -> %. | OK |
-| 14 | ThSD | % | The standard deviation of the throttle after the TOR. | std(throttle*100) | None beyond the global window. Throttle x100 -> %. | OK |
+| 6 | SAmax | deg | Maximum steering wheel angle after the TOR. | max(abs(steer_deg)); steer_deg = steer*450 | Driver steering input (human_steer), not the applied control. Peak magnitude; degrees via steer x450. | OK-ASSUMED |
+| 7 | SAmean | deg | Mean steering wheel angle after the TOR. | mean(abs(steer_deg)) | Driver steering input (human_steer). Magnitude mean; degrees via steer x450. | OK-ASSUMED |
+| 8 | SASD | deg | The standard deviation of the steering wheel angle after the TOR. | std(steer_deg) | Driver steering input (human_steer). SD of the signed angle; degrees via steer x450. | APPROX |
+| 9 | Bmax | MPa | Maximum brake pressure after the TOR. | max(brake*5.0) | Driver brake input (human_brake), x5 -> MPa (assumes 5 MPa max; CARLA has no brake pressure). | APPROX |
+| 10 | Bmean | MPa | Mean brake pressure after the TOR. | mean(brake*5.0) | Driver brake input (human_brake), x5 -> MPa. | APPROX |
+| 11 | BSD | MPa | The standard deviation of the brake pressure after the TOR. | std(brake*5.0) | Driver brake input (human_brake), x5 -> MPa. | APPROX |
+| 12 | Thmax | % | Maximum throttle after the TOR. | max(throttle*100) | Driver throttle input (human_throttle), x100 -> %. | OK |
+| 13 | Thmean | % | Mean throttle after the TOR. | mean(throttle*100) | Driver throttle input (human_throttle), x100 -> %. | OK |
+| 14 | ThSD | % | The standard deviation of the throttle after the TOR. | std(throttle*100) | Driver throttle input (human_throttle), x100 -> %. | OK |
 | 15 | LaAmax | m/s^2 | Maximum lateral acceleration after the TOR. | max(abs(acc_lat)), acc_lat = get_acceleration() projected on lateral axis | Lateral accel = yaw_rate x speed (bicycle model). Planned: CARLA get_acceleration() lateral projection. | OK |
 | 16 | LaAmean | m/s^2 | Mean lateral acceleration after the TOR. | mean(abs(acc_lat)) | Lateral accel = yaw_rate x speed (bicycle model). Planned: CARLA get_acceleration() lateral projection. | OK |
 | 17 | LaASD | m/s^2 | The standard deviation of the lateral acceleration after the TOR. | std(acc_lat) | Lateral accel = yaw_rate x speed (bicycle model). Planned: CARLA get_acceleration() lateral projection. | OK |

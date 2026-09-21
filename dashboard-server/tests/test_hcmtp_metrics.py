@@ -209,6 +209,29 @@ def test_standardizer_missing_file(tmp_path):
     assert Standardizer.from_file(str(tmp_path / "nope.json")) is None
 
 
+def test_metrics_use_driver_input_not_applied_control():
+    # The applied control is full throttle (post-TOR cruise hold), but the
+    # driver has not touched anything: reaction must be censored, and the
+    # throttle metric must reflect the driver (0), not the cruise throttle.
+    rows = [
+        row(t, throttle=1.0, human_steer=0.0, human_throttle=0.0, human_brake=0.0)
+        for t in (0.0, 0.1, 0.2)
+    ]
+    m = compute_raw_metrics(rows, tor_ts=0.0)
+    assert m["RTA"] == 0.2
+    assert m["Thmax"] == 0.0
+    assert m["SAmax"] == 0.0
+
+
+def test_reaction_uses_human_input():
+    rows = [
+        row(0.0, human_steer=0.0, human_throttle=0.0, human_brake=0.0),
+        row(0.1, human_steer=0.05, human_throttle=0.0, human_brake=0.0),
+    ]
+    m = compute_raw_metrics(rows, tor_ts=0.0)
+    assert m["RTS"] == 0.1
+
+
 def test_legacy_rows_still_compute():
     # Old CSVs have none of the raw signal columns; must not crash.
     legacy = [

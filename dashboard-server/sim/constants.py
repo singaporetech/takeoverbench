@@ -6,7 +6,6 @@ All shared magic numbers, timings, and defaults live here — never in applicati
 
 from enum import Enum
 
-
 # ── MQTT ──
 MQTT_TOPIC_PING      = "takeoverbench/ping"
 MQTT_TOPIC_TOR_START = "takeoverbench/tor_start"
@@ -45,6 +44,14 @@ STOP_TIMEOUT_S = 4.0
 TELEMETRY_INTERVAL_S = 0.033  # ~30 Hz
 CONTROLLER_INTERVAL_S = 0.033 # ~30 Hz
 SPAWN_RETRY_COUNT = 20
+
+# ── Post-TOR cruise hold ──
+# After the TOR the vehicle holds its speed until the driver acts, so the
+# scenario cannot be "beaten" by doing nothing. Gains/deadzones below.
+CRUISE_KP = 0.15
+HUMAN_STEER_DEADZONE = 0.02
+HUMAN_THROTTLE_DEADZONE = 0.05
+HUMAN_BRAKE_DEADZONE = 0.05
 
 # ── PID Controller ──
 # Steering gain — how aggressively to turn toward the next waypoint

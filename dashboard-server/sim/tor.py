@@ -34,16 +34,27 @@ def fire_tor(ctrl: Any) -> None:
         post_tor_drive_s = state["scenario_config"].get("post_tor_drive_s", 10)
         state["tor_countdown_s"]  = post_tor_drive_s
 
-    # Hand over cleanly: apply one neutral control so the last autopilot
-    # command is not mistaken for a driver reaction by the absolute
-    # reaction-time thresholds.
-    if ctx["vehicle"] is not None:
+    # Hand over: hold the speed the car had at the TOR until the driver acts,
+    # so the scenario cannot be passed by doing nothing. Recorded driver input
+    # is reset so the cruise throttle is never read as a reaction.
+    veh = ctx["vehicle"]
+    cruise_target = None
+    if veh is not None:
         try:
-            ctx["vehicle"].apply_control(
-                carla.VehicleControl(steer=0.0, throttle=0.0, brake=0.0)
-            )
+            v = veh.get_velocity()
+            cruise_target = math.sqrt(v.x**2 + v.y**2 + v.z**2)
+            veh.apply_control(carla.VehicleControl(
+                steer=0.0,
+                throttle=float(getattr(ctrl, "throttle", 0.0)),
+                brake=0.0,
+                reverse=False,
+            ))
         except Exception:
-            logger.debug("Could not apply neutral control at TOR", exc_info=True)
+            logger.debug("Could not set up cruise hold at TOR", exc_info=True)
+
+    with state_lock:
+        state["cruise_target_ms"] = cruise_target
+        state["human_control"] = {"steer": 0.0, "throttle": 0.0, "brake": 0.0}
 
     logger.info("TOR fired — autopilot disengaged, auto-end in %ss", post_tor_drive_s)
 

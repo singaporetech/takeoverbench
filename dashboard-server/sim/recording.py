@@ -37,6 +37,8 @@ def start_recording(run_id: str):
         state["tor_countdown_s"]  = 0
         state["run_stopping"]     = False
         state["stop_started_ts"]  = None
+        state["cruise_target_ms"] = None
+        state["human_control"]    = {"steer": 0.0, "throttle": 0.0, "brake": 0.0}
         state["autopilot_engaged"] = True
 
     logger.info("Recording started: %s", run_id)
@@ -98,7 +100,9 @@ def stop_recording_and_save() -> tuple | None:
 
     # ── CSV columns: telemetry fields + raw metrics + PC scores ──
     fieldnames = ["timestamp", "speed_ms", "speed_kmh",
-                  "steer", "throttle", "brake", "loc_x", "loc_y", "yaw",
+                  "steer", "throttle", "brake",
+                  "human_steer", "human_throttle", "human_brake",
+                  "loc_x", "loc_y", "yaw",
                   "ttc", "distance_m",
                   # raw CARLA ground-truth signals
                   "vel_x", "vel_y", "vel_z",
