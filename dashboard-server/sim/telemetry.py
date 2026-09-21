@@ -8,8 +8,9 @@ detection to :mod:`sim.tor`, and records rows via :mod:`sim.recording`.
 import logging
 import math
 import time
-from .state import state, state_lock, ctx
+
 from .constants import TELEMETRY_INTERVAL_S, ExperimentPhase
+from .state import ctx, state, state_lock
 from .summary import build_run_summary
 
 logger = logging.getLogger(__name__)
@@ -109,15 +110,28 @@ def telemetry_loop() -> None:
                     continue
 
                 v         = ctx["vehicle"].get_velocity()
+                acc       = ctx["vehicle"].get_acceleration()
+                ang_vel   = ctx["vehicle"].get_angular_velocity()
                 speed_ms  = math.sqrt(v.x**2 + v.y**2 + v.z**2)
                 ctrl      = ctx["vehicle"].get_control()
                 loc       = ctx["vehicle"].get_location()
                 t         = ctx["vehicle"].get_transform()
                 ttc       = _tor.calculate_ttc()
 
+                # Relative position of the lead vehicle, projected onto the
+                # ego's body axes (forward / lateral). 999 = no lead vehicle.
                 dist_m = 999.0
+                lead_long_m = 999.0
+                lead_lat_m = 999.0
                 if ctx["lead_vehicle"]:
-                    dist_m = loc.distance(ctx["lead_vehicle"].get_location())
+                    lead_loc = ctx["lead_vehicle"].get_location()
+                    dist_m = loc.distance(lead_loc)
+                    rel_x = lead_loc.x - loc.x
+                    rel_y = lead_loc.y - loc.y
+                    yaw_rad = math.radians(t.rotation.yaw)
+                    cos_y, sin_y = math.cos(yaw_rad), math.sin(yaw_rad)
+                    lead_long_m = rel_x * cos_y + rel_y * sin_y
+                    lead_lat_m = -rel_x * sin_y + rel_y * cos_y
 
                 row = {
                     "timestamp": round(time.time(), 3),
@@ -131,6 +145,19 @@ def telemetry_loop() -> None:
                     "yaw":       round(t.rotation.yaw, 2),
                     "ttc":       round(ttc, 3),
                     "distance_m": round(dist_m, 2),
+                    # ── Raw CARLA ground-truth signals (for paper-exact metrics) ──
+                    "vel_x": round(v.x, 3),
+                    "vel_y": round(v.y, 3),
+                    "vel_z": round(v.z, 3),
+                    "acc_x": round(acc.x, 3),
+                    "acc_y": round(acc.y, 3),
+                    "acc_z": round(acc.z, 3),
+                    "ang_vel_x": round(ang_vel.x, 4),
+                    "ang_vel_y": round(ang_vel.y, 4),
+                    "ang_vel_z": round(ang_vel.z, 4),
+                    "lead_long_m": round(lead_long_m, 2),
+                    "lead_lat_m": round(lead_lat_m, 2),
+                    "post_tor": 1 if state.get("tor_timestamp") is not None else 0,
                 }
 
                 with state_lock:

@@ -10,7 +10,6 @@ confidence levels for each metric.
 """
 
 import logging
-from typing import Any
 
 import carla
 import numpy as np
@@ -243,6 +242,22 @@ def get_default_metrics() -> dict[str, float]:
     return {k: 0.0 for k in ALL_METRICS}
 
 
+def _optional_array(rows: list[dict], key: str):
+    """Return a float array for *key*, or ``None`` if any row lacks it.
+
+    Used for the raw CARLA signals added in the telemetry schema upgrade;
+    returns ``None`` for older CSVs so callers can fall back to the previous
+    approximation.
+    """
+    values = [r.get(key) for r in rows]
+    if not values or any(v is None for v in values):
+        return None
+    try:
+        return np.array([float(v) for v in values])
+    except (TypeError, ValueError):
+        return None
+
+
 def compute_raw_metrics(rows: list[dict], tor_ts: float | None) -> dict:
     """Compute the 41 raw objective metrics from telemetry rows.
 
@@ -250,13 +265,17 @@ def compute_raw_metrics(rows: list[dict], tor_ts: float | None) -> dict:
     """
     default = get_default_metrics()
 
-    if tor_ts is None or not rows:
+    if not rows:
         return default
 
-    # Filter rows after TOR
-    post_tor = [r for r in rows if r["timestamp"] >= tor_ts]
+    # Filter rows after TOR. Prefer the explicit post_tor flag (new schema);
+    # fall back to the TOR timestamp (old CSVs / live computation).
+    if tor_ts is None:
+        post_tor = [r for r in rows if r.get("post_tor")]
+    else:
+        post_tor = [r for r in rows if r["timestamp"] >= tor_ts]
     if not post_tor:
-        return get_default_metrics()
+        return default
 
     # ── Extract arrays ──
     n = len(post_tor)
@@ -269,6 +288,15 @@ def compute_raw_metrics(rows: list[dict], tor_ts: float | None) -> dict:
     timestamps  = np.array([r.get("timestamp", 0.0) for r in post_tor])
     yaw_deg     = np.array([r.get("yaw", 0.0) for r in post_tor])
 
+    # Optional raw CARLA signals (present only in runs recorded after the
+    # schema upgrade). ``None`` = old CSV → use the legacy approximation.
+    vel_x = _optional_array(post_tor, "vel_x")
+    vel_y = _optional_array(post_tor, "vel_y")
+    acc_x = _optional_array(post_tor, "acc_x")
+    acc_y = _optional_array(post_tor, "acc_y")
+    ang_vel_z = _optional_array(post_tor, "ang_vel_z")
+    lead_long = _optional_array(post_tor, "lead_long_m")
+
     # ── Convert to physical units ──
     steer_deg   = steer_norm * STEER_MAX_DEG          # °
     brake_mpa   = brake_norm * BRAKE_MAX_MPA          # MPa
@@ -278,37 +306,48 @@ def compute_raw_metrics(rows: list[dict], tor_ts: float | None) -> dict:
     dt = np.diff(timestamps)
     dt = np.where(dt < 0.001, 0.001, dt)  # avoid div-by-zero
 
-    # Yaw rate (°/s) — first derivative of yaw
-    yaw_rate_deg_s = np.zeros(n)
-    if n > 1:
-        yaw_diff = np.diff(yaw_deg)
-        yaw_diff = (yaw_diff + 180) % 360 - 180  # normalise to [-180, 180]
-        yaw_rate_deg_s[1:] = yaw_diff / dt
-        yaw_rate_deg_s[0] = yaw_rate_deg_s[1]
+    # Yaw angle relative to the TOR onset (°)
+    yaw_unwrapped = np.unwrap(np.radians(yaw_deg)) * (180.0 / np.pi)
+    yaw_rel_deg = yaw_unwrapped - yaw_unwrapped[0] if n else np.zeros(n)
 
-    # Yaw acceleration (°/s²) — second derivative
+    # Yaw rate (°/s): read the gyro when available, else difference yaw
+    if ang_vel_z is not None:
+        yaw_rate_deg_s = np.degrees(ang_vel_z)
+    else:
+        yaw_rate_deg_s = np.zeros(n)
+        if n > 1:
+            yaw_diff = np.diff(yaw_deg)
+            yaw_diff = (yaw_diff + 180) % 360 - 180  # normalise to [-180, 180]
+            yaw_rate_deg_s[1:] = yaw_diff / dt
+            yaw_rate_deg_s[0] = yaw_rate_deg_s[1]
+
+    # Yaw acceleration (°/s²) — derivative of the yaw rate
     yaw_accel_deg_s2 = np.zeros(n)
-    if n > 2:
-        yaw_accel_deg_s2[1:-1] = np.diff(yaw_rate_deg_s[1:]) / dt[:-1]
-        yaw_accel_deg_s2[0] = yaw_accel_deg_s2[1]
-        yaw_accel_deg_s2[-1] = yaw_accel_deg_s2[-2]
-        # 5-frame moving average to suppress artificial spikes from tiny dt
-        window = min(5, n)
-        kernel = np.ones(window) / window
-        yaw_accel_deg_s2 = np.convolve(yaw_accel_deg_s2, kernel, mode='same')
-
-    # Longitudinal acceleration (m/s²) — dv/dt
-    lo_accel = np.zeros(n)
     if n > 1:
-        lo_accel[1:] = np.diff(speed_ms) / dt
-        lo_accel[0] = lo_accel[1]
-        if n > 5:
-            lo_accel = np.convolve(lo_accel, np.ones(5)/5, mode='same')
+        yaw_accel_deg_s2 = np.gradient(yaw_rate_deg_s, timestamps)
 
-    # Lateral acceleration — yaw_rate × speed (small-angle approximation)
-    yaw_rate_rad = np.radians(yaw_rate_deg_s)
-    lat_accel = yaw_rate_rad * speed_ms                # m/s²
-    lat_vel = lat_accel * np.mean(dt) if n > 1 else np.zeros(n)  # m/s
+    # Body-frame accelerations (m/s²) and velocities (m/s)
+    yaw_rad = np.radians(yaw_deg)
+    cos_y, sin_y = np.cos(yaw_rad), np.sin(yaw_rad)
+
+    if acc_x is not None and acc_y is not None:
+        acc_fwd = acc_x * cos_y + acc_y * sin_y
+        acc_lat = -acc_x * sin_y + acc_y * cos_y
+    else:
+        # Legacy fallback: differentiate speed; lateral = yaw_rate × speed
+        acc_fwd = np.zeros(n)
+        if n > 1:
+            acc_fwd[1:] = np.diff(speed_ms) / dt
+            acc_fwd[0] = acc_fwd[1]
+            if n > 5:
+                acc_fwd = np.convolve(acc_fwd, np.ones(5) / 5, mode="same")
+        acc_lat = np.radians(yaw_rate_deg_s) * speed_ms
+
+    if vel_x is not None and vel_y is not None:
+        vel_lat = -vel_x * sin_y + vel_y * cos_y
+    else:
+        # Legacy fallback: one-tick increment of lateral acceleration
+        vel_lat = acc_lat * np.mean(dt) if n > 1 else np.zeros(n)
 
     # ── Lane-based metrics ──
     lane_offsets = []
@@ -341,7 +380,6 @@ def compute_raw_metrics(rows: list[dict], tor_ts: float | None) -> dict:
         lane_widths = [3.5] * n
 
     lane_offsets_arr = np.array(lane_offsets)
-    lane_widths_arr = np.array(lane_widths)
 
     # ── Metric values ──
     # Reaction times (from telemetry metadata — already detected by tor.py)
@@ -360,10 +398,10 @@ def compute_raw_metrics(rows: list[dict], tor_ts: float | None) -> dict:
     m["RT"] = rt
 
     # 5. TTBT — time to lane boundary at TOR moment (first post-TOR row)
-    if n > 0 and lane_widths[0] > 0 and abs(lat_vel[0]) > 0.001:
+    if n > 0 and lane_widths[0] > 0 and abs(vel_lat[0]) > 0.001:
         dist_to_edge = (lane_widths[0] / 2) - lane_offsets[0]
         if dist_to_edge > 0:
-            m["TTBT"] = round(dist_to_edge / abs(lat_vel[0]), 3)
+            m["TTBT"] = round(dist_to_edge / abs(vel_lat[0]), 3)
 
     # 6-8. Steering amplitude
     m["SAmax"] = round(float(np.max(np.abs(steer_deg))), 3)
@@ -380,57 +418,67 @@ def compute_raw_metrics(rows: list[dict], tor_ts: float | None) -> dict:
     m["Thmean"] = round(float(np.mean(throttle_pct)), 3)
     m["ThSD"] = round(float(np.std(throttle_pct)), 3)
 
-    # 15-17. Lateral acceleration
-    m["LaAmax"] = round(float(np.max(np.abs(lat_accel))), 3)
-    m["LaAmean"] = round(float(np.mean(np.abs(lat_accel))), 3)
-    m["LaASD"] = round(float(np.std(lat_accel)), 3)
+    # 15-17. Lateral acceleration (measured CARLA acceleration)
+    m["LaAmax"] = round(float(np.max(np.abs(acc_lat))), 3)
+    m["LaAmean"] = round(float(np.mean(np.abs(acc_lat))), 3)
+    m["LaASD"] = round(float(np.std(acc_lat)), 3)
 
-    # 18-20. Yaw rate
+    # 18-20. Yaw rate (measured gyro when available)
     m["YRmax"] = round(float(np.max(np.abs(yaw_rate_deg_s))), 3)
     m["YRmean"] = round(float(np.mean(np.abs(yaw_rate_deg_s))), 3)
     m["YRSD"] = round(float(np.std(yaw_rate_deg_s)), 3)
 
-    # 21-23. Yaw angle (unwrapped to handle -180/180 boundary)
-    yaw_unwrapped = np.unwrap(np.radians(yaw_deg)) * (180 / np.pi)
-    m["Ymax"] = round(float(np.max(np.abs(yaw_unwrapped))), 3)
-    m["Ymean"] = round(float(np.mean(np.abs(yaw_unwrapped))), 3)
-    m["YSD"] = round(float(np.std(yaw_unwrapped)), 3)
+    # 21-23. Yaw angle relative to the TOR onset
+    m["Ymax"] = round(float(np.max(np.abs(yaw_rel_deg))), 3)
+    m["Ymean"] = round(float(np.mean(np.abs(yaw_rel_deg))), 3)
+    m["YSD"] = round(float(np.std(yaw_rel_deg)), 3)
 
-    # 24-26. Lateral velocity
-    m["LaVmax"] = round(float(np.max(np.abs(lat_vel))), 3)
-    m["LaVmean"] = round(float(np.mean(np.abs(lat_vel))), 3)
-    m["LaVSD"] = round(float(np.std(lat_vel)), 3)
+    # 24-26. Lateral velocity (measured CARLA velocity)
+    m["LaVmax"] = round(float(np.max(np.abs(vel_lat))), 3)
+    m["LaVmean"] = round(float(np.mean(np.abs(vel_lat))), 3)
+    m["LaVSD"] = round(float(np.std(vel_lat)), 3)
 
     # 27-29. Yaw acceleration
     m["YAmax"] = round(float(np.max(np.abs(yaw_accel_deg_s2))), 3)
     m["YAmean"] = round(float(np.mean(np.abs(yaw_accel_deg_s2))), 3)
     m["YASD"] = round(float(np.std(yaw_accel_deg_s2)), 3)
 
-    # 30-32. Longitudinal acceleration
-    m["LoAmax"] = round(float(np.max(np.abs(lo_accel))), 3)
-    m["LoAmean"] = round(float(np.mean(np.abs(lo_accel))), 3)
-    m["LoASD"] = round(float(np.std(lo_accel)), 3)
+    # 30-32. Longitudinal acceleration (measured CARLA acceleration)
+    m["LoAmax"] = round(float(np.max(np.abs(acc_fwd))), 3)
+    m["LoAmean"] = round(float(np.mean(np.abs(acc_fwd))), 3)
+    m["LoASD"] = round(float(np.std(acc_fwd)), 3)
 
-    # 33. Min relative distance
-    m["MRLD"] = round(float(np.min(dist_m)), 3)
+    # 33. Minimum relative longitudinal distance to the lead vehicle
+    if lead_long is not None:
+        m["MRLD"] = round(float(np.min(np.abs(lead_long))), 3)
+    else:
+        m["MRLD"] = round(float(np.min(dist_m)), 3)
 
     # 34. HFCS — deferred (needs rolling FFT buffer)
     m["HFCS"] = 0.0
 
     # 35. TTC (min after TOR)
-    valid_ttc = ttc_vals[ttc_vals < 998]
-    m["TTC"] = round(float(np.min(valid_ttc)), 3) if len(valid_ttc) > 0 else 999.0
-
-    # 36. DTC = TTC × speed
-    m["DTC"] = round(m["TTC"] * float(np.mean(speed_ms)), 3) if m["TTC"] < 999 else 999.0
+    valid_mask = ttc_vals < 998
+    valid_ttc = ttc_vals[valid_mask]
+    if len(valid_ttc) > 0:
+        m["TTC"] = round(float(np.min(valid_ttc)), 3)
+        # 36. DTC — distance to the lead at the minimum-TTC sample
+        idx = int(np.argmin(np.where(valid_mask, ttc_vals, np.inf)))
+        if lead_long is not None:
+            m["DTC"] = round(float(np.abs(lead_long[idx])), 3)
+        else:
+            m["DTC"] = round(float(dist_m[idx]), 3)
+    else:
+        m["TTC"] = 999.0
+        m["DTC"] = 999.0
 
     # 37. TLC — min time to lane crossing (dynamic, post-TOR)
     tlc_vals = []
     for i in range(n):
-        if lane_widths[i] > 0 and abs(lat_vel[i]) > 0.001:
+        if lane_widths[i] > 0 and abs(vel_lat[i]) > 0.001:
             dist_to_edge = (lane_widths[i] / 2) - lane_offsets[i]
             if dist_to_edge > 0:
-                tlc_vals.append(dist_to_edge / abs(lat_vel[i]))
+                tlc_vals.append(dist_to_edge / abs(vel_lat[i]))
     m["TLC"] = round(float(min(tlc_vals)), 3) if tlc_vals else 999.0
 
     # 38. TCLC — deferred (needs lane-change detection)

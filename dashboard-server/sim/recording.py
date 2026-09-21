@@ -8,8 +8,10 @@ persistence with HCMTP PC-score and raw-metric columns.
 import csv
 import logging
 from typing import Any
+
 import config
-from .state import state, state_lock, ctx
+
+from .state import state, state_lock
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +87,7 @@ def stop_recording_and_save() -> tuple | None:
     pcs = {}
     metric_order: list[str] = []
     try:
-        from .hcmtp import compute_raw_metrics, compute_pcs, ALL_METRICS
+        from .hcmtp import ALL_METRICS, compute_pcs, compute_raw_metrics
         raw = compute_raw_metrics(rows, tor_ts)
         if rts is not None:
             raw["RTS"] = rts
@@ -115,7 +117,13 @@ def stop_recording_and_save() -> tuple | None:
     # ── CSV columns: telemetry fields + raw metrics + PC scores ──
     fieldnames = ["timestamp", "speed_ms", "speed_kmh",
                   "steer", "throttle", "brake", "loc_x", "loc_y", "yaw",
-                  "ttc", "distance_m"]
+                  "ttc", "distance_m",
+                  # raw CARLA ground-truth signals
+                  "vel_x", "vel_y", "vel_z",
+                  "acc_x", "acc_y", "acc_z",
+                  "ang_vel_x", "ang_vel_y", "ang_vel_z",
+                  "lead_long_m", "lead_lat_m",
+                  "post_tor"]
 
     extra_columns = metric_order + [f"pc{i}" for i in range(1, 10)]
 
