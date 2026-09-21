@@ -169,8 +169,8 @@ class LogoFlowable(Flowable):
 # ═══════════════════════════════════════════════════════════════
 PC_NAMES: list[dict[str, Any]] = [
     {
-        "name": "PC1 — Lateral Control", 
-        "positive": "Smooth, minimal corrections", 
+        "name": "PC1 — Lateral Control",
+        "measures": "How smoothly the driver steers: steering amplitude plus yaw and lateral movement.","positive": "Smooth, minimal corrections", 
         "negative": "Erratic steering", 
         "target": "-2.0 to +1.0", 
         "ideal": "-0.5",
@@ -179,8 +179,8 @@ PC_NAMES: list[dict[str, Any]] = [
         "neg_critical": "Extreme over-correction, losing structural vehicle control"
     },
     {
-        "name": "PC2 — Longitudinal Brake", 
-        "positive": "Light, controlled braking", 
+        "name": "PC2 — Longitudinal Brake",
+        "measures": "How hard and how consistently the driver brakes.","positive": "Light, controlled braking", 
         "negative": "Hard, heavy braking (panic)", 
         "target": "-2.0 to +0.5", 
         "ideal": "-0.5",
@@ -189,8 +189,8 @@ PC_NAMES: list[dict[str, Any]] = [
         "neg_critical": "Brake slammed completely to floor — structural panic response"
     },
     {
-        "name": "PC3 — Distance Security", 
-        "positive": "Safe, large TTC/DTC margins", 
+        "name": "PC3 — Distance Security",
+        "measures": "How much safety margin remains (time and distance to collision).","positive": "Safe, large TTC/DTC margins", 
         "negative": "Close to collision", 
         "target": "-5.0 to -1.0", 
         "ideal": "-2.0",
@@ -199,8 +199,8 @@ PC_NAMES: list[dict[str, Any]] = [
         "neg_critical": "Critical close proximity — near-collision or collision event"
     },
     {
-        "name": "PC4 — Longitudinal Throttle", 
-        "positive": "Heavy or jerky throttle", 
+        "name": "PC4 — Longitudinal Throttle",
+        "measures": "How the driver uses the throttle.","positive": "Heavy or jerky throttle", 
         "negative": "Smooth, light throttle", 
         "target": "-1.0 to +1.0", 
         "ideal": "0.0",
@@ -209,8 +209,8 @@ PC_NAMES: list[dict[str, Any]] = [
         "neg_critical": "Volatile throttle pinning out of bounds"
     },
     {
-        "name": "PC5 — Reaction Time", 
-        "positive": "Fast reaction", 
+        "name": "PC5 — Reaction Time",
+        "measures": "How quickly the driver reacts to the takeover request.","positive": "Fast reaction", 
         "negative": "Slow reaction", 
         "target": "+0.5 to +5.0", 
         "ideal": "> +2.0",
@@ -219,8 +219,8 @@ PC_NAMES: list[dict[str, Any]] = [
         "neg_critical": "Critical delay or completely passive failure to react"
     },
     {
-        "name": "PC6 — Lateral Fine Control", 
-        "positive": "Jerky yaw/lateral movement", 
+        "name": "PC6 — Lateral Fine Control",
+        "measures": "Fine lateral control: average steering / lateral acceleration and yaw-rate activity.","positive": "Jerky yaw/lateral movement", 
         "negative": "Smooth, stable", 
         "target": "-1.0 to +1.0", 
         "ideal": "0.0",
@@ -230,7 +230,7 @@ PC_NAMES: list[dict[str, Any]] = [
     },
     {
         "name": "PC7 — Lane Keeping",
-        "positive": "Wandering, high lane-centre error",
+        "measures": "How well the car stays in its lane (lane-centre error).","positive": "Wandering, high lane-centre error",
         "negative": "Centred in lane",
         "target": "-1.0 to +1.0",
         "ideal": "0.0",
@@ -240,7 +240,7 @@ PC_NAMES: list[dict[str, Any]] = [
     },
     {
         "name": "PC8 — Yaw Stability",
-        "positive": "Smooth yaw, stable heading",
+        "measures": "How stable the car's yaw is (directional stability).","positive": "Smooth yaw, stable heading",
         "negative": "High yaw acceleration (unstable)",
         "target": "-1.0 to +1.0",
         "ideal": "0.0",
@@ -249,8 +249,8 @@ PC_NAMES: list[dict[str, Any]] = [
         "neg_critical": "Severe yaw instability — loss of directional control"
     },
     {
-        "name": "PC9 — Lateral Velocity", 
-        "positive": "Stable lateral position", 
+        "name": "PC9 — Lateral Velocity",
+        "measures": "Side-to-side (lateral) movement stability.","positive": "Stable lateral position", 
         "negative": "Fast side-to-side (swerving)", 
         "target": "-1.0 to +0.5", 
         "ideal": "-0.3",
@@ -259,6 +259,51 @@ PC_NAMES: list[dict[str, Any]] = [
         "neg_critical": "Severe lateral swerving (loss of transient state)"
     },
 ]
+
+# Plain-English one-liners for the 41 metrics (shown in the /info guide).
+METRIC_LABELS: dict[str, str] = {
+    "RTS": "how quickly the driver first turns the wheel",
+    "RTB": "how quickly the driver first brakes",
+    "RTA": "how quickly the driver first presses the accelerator",
+    "RT": "the quickest of the three reactions above",
+    "TTBT": "time until the car would reach the lane edge at takeover",
+    "SAmax": "largest steering-wheel angle",
+    "SAmean": "average steering-wheel angle",
+    "SASD": "how much the steering wheel varies",
+    "Bmax": "hardest braking",
+    "Bmean": "average braking",
+    "BSD": "how much braking varies",
+    "Thmax": "most throttle used",
+    "Thmean": "average throttle used",
+    "ThSD": "how much throttle varies",
+    "LaAmax": "strongest sideways acceleration",
+    "LaAmean": "average sideways acceleration",
+    "LaASD": "how much sideways acceleration varies",
+    "YRmax": "fastest rotation (yaw) rate",
+    "YRmean": "average rotation rate",
+    "YRSD": "how much rotation rate varies",
+    "Ymax": "largest heading change",
+    "Ymean": "average heading change",
+    "YSD": "how much heading varies",
+    "LaVmax": "fastest sideways (lateral) speed",
+    "LaVmean": "average sideways speed",
+    "LaVSD": "how much sideways speed varies",
+    "YAmax": "largest change in rotation rate",
+    "YAmean": "average change in rotation rate",
+    "YASD": "how much rotation-rate change varies",
+    "LoAmax": "strongest forward/back acceleration",
+    "LoAmean": "average forward/back acceleration",
+    "LoASD": "how much forward/back acceleration varies",
+    "MRLD": "smallest gap to the vehicle ahead",
+    "HFCS": "how much high-frequency jitter is in the steering",
+    "TTC": "smallest time-to-collision",
+    "DTC": "smallest distance-to-collision",
+    "TLC": "smallest time until a lane line is crossed",
+    "TCLC": "time taken to complete a lane change",
+    "ECLmax": "largest distance from the lane centre",
+    "ECLmean": "average distance from the lane centre",
+    "SDLP": "how much the car drifts side-to-side in the lane",
+}
 
 PC_TARGETS: list[tuple[float, float]] = [
     (-2.0, 1.0), (-2.0, 0.5), (-5.0, -1.0), (-1.0, 1.0), (0.5, 5.0),

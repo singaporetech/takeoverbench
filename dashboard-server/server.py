@@ -95,6 +95,22 @@ def setup():
     return render_template("setup.html")
 
 
+@app.route("/info")
+def info():
+    """Plain-English explainer for the HCMTP principal components (PC1-PC9)."""
+    from sim.hcmtp import PC_WEIGHTS
+    from sim.report import METRIC_LABELS, PC_NAMES
+
+    pc_metrics = []
+    for weights in PC_WEIGHTS:
+        ordered = sorted(weights.items(), key=lambda kv: -abs(kv[1]))
+        pc_metrics.append([
+            {"metric": name, "label": METRIC_LABELS.get(name, ""), "weight": weight}
+            for name, weight in ordered
+        ])
+    return render_template("info.html", pcs=PC_NAMES, pc_metrics=pc_metrics)
+
+
 # ─────────────────────────────────────────
 # VIDEO FEED
 # ─────────────────────────────────────────

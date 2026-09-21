@@ -767,3 +767,21 @@ body {
   .breakdown-header span:nth-child(3),
   .breakdown-remarks { display: none; }
 }
+
+/* ══════════════════════════════════════
+   CREDITS / INFO LINK
+══════════════════════════════════════ */
+.fidelity-credit {
+  font-size: 13px;
+  color: var(--text-dim);
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+.fidelity-credit a { color: var(--accent); }
+
+.info-link { margin-top: 8px; font-size: 13px; }
+.info-link a { color: var(--accent); text-decoration: none; }
