@@ -191,12 +191,18 @@ def status():
         })
 
 def _get_next_preset(state):
-    """Return the next preset in the queue (or None)."""
+    """Return the next preset in the queue (or None).
+
+    While a run is active, ``active_preset_index`` points at the *current*
+    preset, so the next is ``idx + 1``. Once a run auto-ends, telemetry
+    advances the index to the *next* preset, so the next is ``idx``.
+    """
     queue = state.get("preset_queue", [])
     idx = state.get("active_preset_index", 0)
-    new_idx = idx + 1
-    if queue and new_idx < len(queue):
-        return get_preset(queue[new_idx])
+    if state.get("scenario_running"):
+        idx += 1
+    if queue and 0 <= idx < len(queue):
+        return get_preset(queue[idx])
     return None
 
 
@@ -369,6 +375,7 @@ def start_scenario():
 
     def _do_setup():
         run_id = str(uuid.uuid4())[:8]
+        runner.clear_message()  # clear the participant-facing CARLA message
         success = runner.setup_scenario()
         if success:
             # Ensure session folder exists (creates once, reuses)

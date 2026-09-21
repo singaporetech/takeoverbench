@@ -11,7 +11,13 @@ import time
 
 import carla
 
-from .constants import TELEMETRY_INTERVAL_S, ExperimentPhase
+from . import hud as _hud
+from .constants import (
+    STOP_SPEED_THRESHOLD_MS,
+    STOP_TIMEOUT_S,
+    TELEMETRY_INTERVAL_S,
+    ExperimentPhase,
+)
 from .state import ctx, state, state_lock
 from .summary import build_run_summary
 
@@ -74,6 +80,14 @@ def telemetry_loop() -> None:
 
                 logger.info("Auto-end: run saved, queue advanced")
 
+                # ── Participant-facing message in the CARLA window ──
+                if queue and new_idx < len(queue):
+                    _hud.set_message("SCENARIO COMPLETE — please wait for the next run")
+                elif queue:
+                    _hud.set_message("SESSION COMPLETE — thank you for participating")
+                else:
+                    _hud.set_message("SCENARIO COMPLETE")
+
                 # ── Auto-save PDF if the set is complete ──
                 if queue and new_idx >= len(queue) and state.get("active_set_id"):
                     try:
@@ -105,6 +119,26 @@ def telemetry_loop() -> None:
             update = ctx.get("spectator_update")
             if update:
                 update()
+
+            # Keep the participant-facing message on screen (redrawn each tick)
+            _hud.draw(ctx["world"])
+
+        # ── End-of-run stopping: wait for the ego to halt, then finish ──
+        if state.get("tor_phase") == "stopping":
+            speed_ms = 0.0
+            if ctx["vehicle"] is not None:
+                try:
+                    v = ctx["vehicle"].get_velocity()
+                    speed_ms = math.sqrt(v.x**2 + v.y**2 + v.z**2)
+                except Exception:
+                    speed_ms = 0.0
+            started = state.get("stop_started_ts") or time.time()
+            if speed_ms < STOP_SPEED_THRESHOLD_MS or (time.time() - started) > STOP_TIMEOUT_S:
+                with state_lock:
+                    state["run_stopping"] = False
+                    state["tor_phase"] = "auto_ended"
+            time.sleep(TELEMETRY_INTERVAL_S)
+            continue
 
         if ctx["vehicle"] is not None and state.get("scenario_running"):
             try:

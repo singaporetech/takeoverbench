@@ -20,19 +20,22 @@ and pedal inputs pass through directly to CARLA.
 import logging
 import math
 import time
+
 import carla
+
 from sim.constants import (
-    PID_KP_STEER,
-    PID_KP_SPEED,
+    CONTROLLER_INTERVAL_S,
     PID_KI_SPEED,
-    PID_THROTTLE_FF_FACTOR,
+    PID_KP_SPEED,
+    PID_KP_STEER,
     PID_LOOK_AHEAD_M,
     PID_OVERSPEED_BRAKE_THRESHOLD,
     PID_SAFETY_BRAKE_DIST_M,
     PID_SAFETY_BRAKE_MIN_SPEED,
-    CONTROLLER_INTERVAL_S,
+    PID_THROTTLE_FF_FACTOR,
 )
-from .state import state, state_lock, ctx
+
+from .state import ctx, state, state_lock
 
 logger = logging.getLogger(__name__)
 
@@ -150,6 +153,15 @@ def run_controller(target_speed_kmh: float) -> None:
             # ── Read autopilot flag ──
             with state_lock:
                 autopilot = state["autopilot_engaged"]
+                stopping = state.get("run_stopping", False)
+
+            # ── End-of-run: brake to a halt (single control writer) ──
+            if stopping:
+                ctx["vehicle"].apply_control(carla.VehicleControl(
+                    throttle=0.0, brake=1.0, steer=0.0, reverse=False,
+                ))
+                time.sleep(CONTROLLER_INTERVAL_S)
+                continue
 
             # ── Autopilot branch ──
             if autopilot:

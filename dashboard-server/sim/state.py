@@ -1,8 +1,9 @@
 """
 Shared state and global references for CARLA simulation modules.
 """
-from typing import Any
 import threading
+from typing import Any
+
 from sim.constants import ExperimentPhase
 
 state: dict[str, Any] = {
@@ -34,8 +35,10 @@ state: dict[str, Any] = {
     # ── TOR state ──
     "tor_triggered": False,
     "tor_timestamp": None,
-    "tor_phase": "idle",   # idle / coasting / tor_end / auto_ended
+    "tor_phase": "idle",   # idle / coasting / tor_end / stopping / auto_ended
     "tor_countdown_s": 0,  # seconds remaining on auto-end timer
+    "run_stopping": False,  # True while braking to a halt at end of run
+    "stop_started_ts": None,
 
     # ── Teleop / manual control ──
     # True  = PID controller driving (pre-TOR autopilot phase)

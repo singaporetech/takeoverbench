@@ -68,12 +68,14 @@ def fire_tor(ctrl: Any) -> None:
                 logger.info("TOR_END skipped (phase=%s)", state.get("tor_phase"))
 
     def _auto_end_now():
-        """Trigger auto-end. Telemetry loop detects the phase and handles it."""
+        """Begin the end-of-run stop. Telemetry ends the run once halted."""
         with state_lock:
             if state.get("tor_phase") in ("coasting", "tor_end"):
-                state["tor_phase"] = "auto_ended"
+                state["tor_phase"] = "stopping"
+                state["run_stopping"] = True
+                state["stop_started_ts"] = time.time()
                 state["tor_countdown_s"] = 0
-                logger.info("Auto-end (%ss after TOR)", post_tor_drive_s)
+                logger.info("Stopping (%ss after TOR)", post_tor_drive_s)
             else:
                 logger.info("Auto-end cancelled (phase=%s)", state.get("tor_phase"))
 

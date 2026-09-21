@@ -39,6 +39,9 @@ class ExperimentPhase(str, Enum):
 # ── Scenario Defaults ──
 # Fire TOR_END slightly before auto-end so HMI returns to idle state
 TOR_END_BUFFER_S = 0.5
+# End-of-run: brake to a halt before removing the ego vehicle
+STOP_SPEED_THRESHOLD_MS = 0.5
+STOP_TIMEOUT_S = 4.0
 TELEMETRY_INTERVAL_S = 0.033  # ~30 Hz
 CONTROLLER_INTERVAL_S = 0.033 # ~30 Hz
 SPAWN_RETRY_COUNT = 20

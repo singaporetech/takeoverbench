@@ -35,6 +35,8 @@ def start_recording(run_id: str):
         state["tor_timestamp"]    = None
         state["tor_phase"]        = "idle"
         state["tor_countdown_s"]  = 0
+        state["run_stopping"]     = False
+        state["stop_started_ts"]  = None
         state["autopilot_engaged"] = True
 
     logger.info("Recording started: %s", run_id)
