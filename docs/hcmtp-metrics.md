@@ -6,58 +6,18 @@ This document describes how TakeoverBench implements the **Human-Centred Compreh
 
 ## 41 Objective Metrics
 
-| # | Metric | Unit | Definition | Status | Confidence | Notes |
-|---|--------|------|------------|--------|------------|-------|
-| 1 | RTS | s | Time from TOR until steer > 2° | Computed | Exact |  Computable (convert steer 0-1 → degrees, CARLA steer ×450°) |
-| 2 | RTB | s | Time from TOR until brake > 10% | Computed | Exact | |
-| 3 | RTA | s | Time from TOR until throttle > 5% | Computed | Exact | |
-| 4 | RT | s | min(RTS, RTB, RTA) | Computed | Exact | |
-| 5 | TTBT | s | Time to lane boundary at TOR onset (t=0 snapshot) | Computed | Approx | Instantaneous. distance_to_edge / lateral_velocity at t=0. Differs from TLC which tracks continuously. |
-| 6 | SAmax | ° | Max steering wheel angle | Computed | Approx |  Compute from steer normalized × 450° |
-| 7 | SAmean | ° | Mean steering wheel angle | Computed | Approx |  Compute from steer normalized × 450° |
-| 8 | SASD | ° | SD of steering wheel angle | Computed | Approx |  Compute from steer normalized × 450° |
-| 9 | Bmax | MPa | Max brake pressure | Computed | Approx | |
-| 10 | Bmean | MPa | Mean brake pressure | Computed | Approx | |
-| 11 | BSD | MPa | SD of brake pressure | Computed | Approx | |
-| 12 | Thmax | % | Max throttle position | Computed | Exact | |
-| 13 | Thmean | % | Mean throttle position | Computed | Exact | |
-| 14 | ThSD | % | SD of throttle position | Computed | Exact | |
-| 15 | LaAmax | m/s² | Max lateral acceleration | Computed | Exact | |
-| 16 | LaAmean | m/s² | Mean lateral acceleration | Computed | Exact | |
-| 17 | LaASD | m/s² | SD of lateral acceleration | Computed | Exact | |
-| 18 | YRmax | °/s | Max yaw rate | Computed | Exact | |
-| 19 | YRmean | °/s | Mean yaw rate | Computed | Exact | |
-| 20 | YRSD | °/s | SD of yaw rate | Computed | Exact | |
-| 21 | Ymax | ° | Max yaw angle | Computed | Exact | |
-| 22 | Ymean | ° | Mean yaw angle | Computed | Exact | |
-| 23 | YSD | ° | SD of yaw angle | Computed | Exact | |
-| 24 | LaVmax | m/s | Max lateral velocity | Computed | Exact | |
-| 25 | LaVmean | m/s | Mean lateral velocity | Computed | Exact | |
-| 26 | LaVSD | m/s | SD of lateral velocity | Computed | Exact | |
-| 27 | YAmax | °/s² | Max yaw acceleration | Computed | Exact | |
-| 28 | YAmean | °/s² | Mean yaw acceleration | Computed | Exact | |
-| 29 | YASD | °/s² | SD of yaw acceleration | Computed | Exact | |
-| 30 | LoAmax | m/s² | Max longitudinal acceleration | Computed | Exact | |
-| 31 | LoAmean | m/s² | Mean longitudinal acceleration | Computed | Exact | |
-| 32 | LoASD | m/s² | SD of longitudinal acceleration | Computed | Exact | |
-| 33 | MRLD | m | Min relative distance to other vehicles | Computed | Exact | |
-| 34 | HFCS | — | High-freq steering content ratio | Deferred | Deferred | |
-| 35 | TTC | s | Min time to collision | Computed | Exact | |
-| 36 | DTC | m | Min distance to collision | Computed | Exact | |
-| 37 | TLC | s | Min time to lane crossing (dynamic, post-TOR t>0) | Computed | Exact | Dynamic: distance_to_edge / lateral_velocity tracked continuously. |
-| 38 | TCLC | s | Time to complete a lane change | Deferred | Deferred | Needs lane-change start/end detection (lane_id transitions). |
-| 39 | ECLmax | m | Max lateral offset from lane center (post-TOR) | Computed | Exact | Waypoint-based: max \|vehicle_pos - waypoint_center\|. |
-| 40 | ECLmean | m | Mean lateral offset from lane center (post-TOR) | Computed | Exact | Waypoint-based: mean \|vehicle_pos - waypoint_center\|. |
-| 41 | SDLP | m | SD of lateral position (post-TOR) | Computed | Exact | Waypoint-based: std \|vehicle_pos - waypoint_center\|. |
+The 41 metrics, their paper definitions (Table II), how TakeoverBench calculates each one, the assumptions we make, and the current implementation status are all maintained in one generated place:
 
-## Confidence Levels
+- **[`hcmtp-metric-calculations.md`](./hcmtp-metric-calculations.md)** — readable per-metric table (generated).
+- **[`hcmtp-metric-audit.csv`](./hcmtp-metric-audit.csv)** — the machine-readable source of truth.
 
-| Level | Count | Meaning |
-|---|---|---|
-| Exact | 32 | Same metric, same unit, same methodology as the paper. |
-| Approx | 7 | Same metric and unit, but conversion factors are assumed (not hardware-calibrated) or use CARLA approximations. See implementation notes below. |
-| Deferred | 2 | Metric not implemented (HFCS, TCLC). Planned for future. |
-| **Total** | **41** | |
+The CSV is canonical: to change a metric's definition, assumption, formula, or status, edit the CSV and run:
+
+```bash
+python dashboard-server/scripts/generate_hcmtp_doc.py
+```
+
+**Current status (from the CSV):** OK 21 · OK-ASSUMED 6 · APPROX 5 · BUG 6 · DEFERRED 2 · DECIDE 1.
 
 ### Approximation Notes
 
@@ -72,121 +32,125 @@ This document describes how TakeoverBench implements the **Human-Centred Compreh
 
 **Impact**: PC3 (Distance Security) has reduced accuracy because TCLC is not yet implemented. Once lane-change detection is added, PC3 will be complete. ECLmax/ECLmean/SDLP are now computed via waypoints.
 
-**Note:** The paper's Table III uses "YR" as a typographical truncation of $YR_{max}$ (yaw rate max). Our code keys this as `YRmax`.
+**Note:** Table III lists every metric as its **own row**. It does **not** use "(incl.)" grouping — adjacent metrics such as `Ymax`/`Ymean`, `YAmax`/`YAmean`, `SAmean`/`SASD`, `YRmean`/`YRSD`, and `LaVmean`/`LaVmax` carry **different** loadings on **different** PCs. Never duplicate a loading across a pair.
 
 ## PCA Loading Weights
 
-Reference: Li et al. (2023) — IEEE Transactions on Intelligent Transportation Systems
-DOI: 10.1109/TITS.2023.3241850
+Reference: Li, Q., Wang, Z., Wang, W., Zeng, C., Wu, C., Li, G., Heh, J.-S., & Cheng, B. (2023). A Human-Centered Comprehensive Measure of Take-Over Performance Based on Multiple Objective Metrics. *IEEE Transactions on Intelligent Transportation Systems*, 24(4), 4235–4240.
+DOI: 10.1109/TITS.2022.3233623
 
-The 41 objective metrics are reduced to 9 principal components via Sparse Principal Component Analysis (SPCA). The loading weights from Table III of the paper are used below. All 9 components together explain 76.93% of total variance.
+The 41 objective metrics are reduced to 9 principal components via Sparse Principal Component Analysis (SPCA). The loading weights from Table III (p. 4243) are transcribed below. All 9 components together explain 76.93% of total variance.
+
+> **Implementation status is tracked separately.** The per-metric code-vs-paper audit (definition, unit, source signal, current formula, status, fix) lives in [`hcmtp-metric-audit.csv`](./hcmtp-metric-audit.csv). Many metrics are currently **not** computed per the paper — always check that file before interpreting scores.
 
 ### PC1 — Lateral Control (29.92% variance)
 | Metric | Loading |
 |--------|---------|
-| SASD (incl. SAmean) | -0.381 |
-| LaASD | -0.351 |
-| YRSD (incl. YRmean) | -0.337 |
-| LaAmax | -0.302 |
-| Ymean (incl. Ymax) | -0.299 |
-| LaVmean (incl. LaVmax) | -0.292 |
-| YSD | -0.290 |
 | SAmax | -0.267 |
-| HFCS | -0.264 |
+| SASD | -0.381 |
+| LaAmax | -0.302 |
+| LaASD | -0.351 |
 | YRmax | -0.251 |
+| YRSD | -0.337 |
+| Ymax | -0.299 |
+| YSD | -0.290 |
+| LaVmax | -0.292 |
 | LaVSD | -0.241 |
+| YAmean | -0.094 |
 | YASD | -0.112 |
-| YAmean (incl. YAmax) | -0.094 |
-| TLC | 0.056 |
 | MRLD | 0.004 |
+| HFCS | -0.264 |
+| TLC | 0.056 |
 
 ### PC2 — Longitudinal Control (variance not explicitly given)
 | Metric | Loading |
 |--------|---------|
+| Bmax | -0.428 |
 | Bmean | -0.498 |
 | BSD | -0.470 |
-| Bmax | -0.428 |
-| LoASD | -0.328 |
-| LoAmax | -0.235 |
 | RTB | 0.332 |
-| Ymean (incl. Ymax) | 0.137 |
-| MRLD | 0.119 |
 | RTA | 0.037 |
-| YAmean (incl. YAmax) | 0.019 |
-| LoAmean | 0.016 |
 | RT | 0.012 |
+| Ymean | 0.137 |
+| YAmean | 0.019 |
+| LoAmax | -0.235 |
+| LoAmean | 0.016 |
+| LoASD | -0.328 |
+| MRLD | 0.119 |
 | TLC | -0.037 |
 
 ### PC3 — Distance Security (variance not explicitly given)
 | Metric | Loading |
 |--------|---------|
-| TCLC | 0.518 |
-| TTC | 0.517 |
-| DTC | 0.497 |
-| TTBT | 0.465 |
 | RTS | 0.214 |
 | RTB | 0.115 |
+| TTBT | 0.465 |
 | Bmean | 0.108 |
+| YAmean | -0.095 |
 | MRLD | 0.103 |
-| YAmean (incl. YAmax) | -0.095 |
+| TTC | 0.517 |
+| DTC | 0.497 |
+| TCLC | 0.518 |
 
 ### PC4 — Longitudinal Control (variance not explicitly given)
 | Metric | Loading |
 |--------|---------|
-| Thmean | 0.497 |
-| Thmax | 0.494 |
-| LoAmean | 0.377 |
-| ThSD | 0.279 |
-| MRLD | 0.156 |
-| Ymean (incl. Ymax) | 0.096 |
-| LoAmax | 0.028 |
 | RTA | -0.336 |
+| Thmax | 0.494 |
+| Thmean | 0.497 |
+| ThSD | 0.279 |
+| Ymean | 0.096 |
+| LoAmax | 0.028 |
+| LoAmean | 0.377 |
+| MRLD | 0.156 |
 
 ### PC5 — Reaction Time (variance not explicitly given)
 | Metric | Loading |
 |--------|---------|
-| Ymean (incl. Ymax) | 0.121 |
-| LoAmean | -0.064 |
-| RTA | -0.088 |
-| RTB | -0.118 |
-| RT | -0.537 |
-| TLC | -0.574 |
 | RTS | -0.585 |
+| RTB | -0.118 |
+| RTA | -0.088 |
+| RT | -0.537 |
+| Ymean | 0.121 |
+| LoAmean | -0.064 |
+| TLC | -0.574 |
 
 ### PC6 — Lateral Control (variance not explicitly given)
 | Metric | Loading |
 |--------|---------|
-| YRSD (incl. YRmean) | 0.617 |
-| LaASD | 0.604 |
-| YAmean (incl. YAmax) | 0.243 |
+| SAmean | 0.442 |
+| LaAmean | 0.604 |
+| YRmean | 0.617 |
+| YAmean | 0.243 |
 | LoAmax | 0.066 |
 
-### PC7 — Lateral Control (variance not explicitly given)
+### PC7 — Lane Keeping (variance not explicitly given)
 | Metric | Loading |
 |--------|---------|
-| SASD (incl. SAmean) | 0.442 |
-| Ymean (incl. Ymax) | 0.153 |
+| Ymean | 0.153 |
 | MRLD | -0.022 |
-
-### PC8 — Lateral Control (variance not explicitly given)
-| Metric | Loading |
-|--------|---------|
-| ECLmean | 0.657 |
 | ECLmax | 0.550 |
+| ECLmean | 0.657 |
 | SDLP | 0.516 |
-| YRmax | -0.103 |
-| YAmean (incl. YAmax) | -0.889 |
 
-### PC9 — Lateral Control (2.51% variance)
+### PC8 — Yaw / Lateral (variance not explicitly given)
 | Metric | Loading |
 |--------|---------|
-| Ymean (incl. Ymax) | 0.241 |
-| YAmean (incl. YAmax) | 0.149 |
-| LaVmean (incl. LaVmax) | -0.871 |
+| YRmax | -0.103 |
+| YAmax | -0.889 |
+| YAmean | 0.149 |
+
+### PC9 — Lateral Velocity (2.51% variance)
+| Metric | Loading |
+|--------|---------|
+| Ymean | 0.241 |
+| LaVmean | -0.871 |
 
 ## Conversion Factors
 
 These constants convert CARLA's normalized telemetry values into the physical units used by HCMTP. All constants are documented here so they can be tuned per hardware setup.
+
+> **Intended vs actual:** the Yaw Rate, Lateral Acceleration, Longitudinal Acceleration, and Lateral Velocity rows below describe the **intended** source signals (`get_angular_velocity()`, `get_acceleration()`, `get_velocity()` projections). The current code does **not** use them — it finite-differences yaw/speed and models lateral acceleration as `yaw_rate × speed`. See [`hcmtp-metric-audit.csv`](./hcmtp-metric-audit.csv).
 
 | Metric Group | CARLA Raw | Conversion | Physical Unit | Source |
 |---|---|---|---|---|
@@ -220,14 +184,14 @@ If a metric has σ near zero across the dataset, a σ floor of 0.1 or 1% of the 
 
 ## Reaction Time Thresholds
 
-These thresholds align our `_check_reaction()` function with the HCMTP paper definitions.
+> **Status: BUG.** The paper defines absolute thresholds. The current `_check_reaction()` (`sim/tor.py:106-125`) instead measures the *delta from a 100 ms post-TOR baseline*, to avoid counting residual autopilot input. That is not the paper's definition. Planned fix: detect the paper's absolute thresholds (steer > 2°, brake > 10%, throttle > 5°) and handle the autopilot residual explicitly (e.g. zero the vehicle control at TOR).
 
-| Metric | Paper Definition | Our Threshold | Notes |
+| Metric | Paper definition | Current code | Notes |
 |---|---|---|---|
-| RTS | Steer > 2° (steering wheel) | steer_normalized > 0.0044 | 2° / 450° max = 0.0044. STEER_MAX_DEG=450° (900° lock-to-lock). |
-| RTB | Brake > 10% | brake > 0.10 | Direct percentage match |
-| RTA | Throttle > 5% | throttle > 0.05 | Direct percentage match |
-| RT | min(RTS, RTB, RTA) | min(RTS, RTB, RTA) | Same logic as paper |
+| RTS | steer > 2° (absolute) | delta from baseline > 0.0044 | 2° / 450° = 0.0044; the ×450° conversion is assumed. |
+| RTB | brake > 10% (absolute) | delta from baseline > 0.10 | |
+| RTA | throttle > 5% (absolute) | delta from baseline > 0.05 | |
+| RT | min(RTS, RTB, RTA) | first detected input | Missing inputs not handled. |
 
 ## Unified HCMTP Score (Future Work)
 
