@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import math
 
-from sim.hcmtp import compute_raw_metrics
+from sim.hcmtp import ALL_METRICS, Standardizer, compute_pcs, compute_raw_metrics
 
 RAW_KEYS = (
     "vel_x", "vel_y", "vel_z",
@@ -68,11 +68,26 @@ def test_lateral_velocity_projection():
     assert m["LaVmax"] == 1.0
 
 
-def test_yaw_rate_from_gyro():
-    # 0.5 rad/s == 28.648 deg/s
-    rows = [row(t, ang_vel_z=0.5) for t in (0.0, 0.1, 0.2)]
+def test_yaw_rate_gyro_in_degrees_passes_through():
+    # CARLA on this rig reports angular velocity in deg/s. Heading changes
+    # 0.5° per 0.1 s = 5 °/s and the gyro agrees, so it must pass through
+    # unchanged (regression: it used to be multiplied by 180/π).
+    rows = [row(0.0, yaw=0.0, ang_vel_z=5.0),
+            row(0.1, yaw=0.5, ang_vel_z=5.0),
+            row(0.2, yaw=1.0, ang_vel_z=5.0)]
     m = compute_raw_metrics(rows, tor_ts=0.0)
-    assert m["YRmean"] == round(math.degrees(0.5), 3)
+    assert abs(m["YRmean"] - 5.0) < 1e-6
+
+
+def test_yaw_rate_gyro_in_radians_is_converted():
+    # Same motion, but the gyro reports rad/s (CARLA's documented unit):
+    # 5 °/s == 0.0872665 rad/s. The auto-detect must normalise it to 5 °/s.
+    rad = math.radians(5.0)
+    rows = [row(0.0, yaw=0.0, ang_vel_z=rad),
+            row(0.1, yaw=0.5, ang_vel_z=rad),
+            row(0.2, yaw=1.0, ang_vel_z=rad)]
+    m = compute_raw_metrics(rows, tor_ts=0.0)
+    assert abs(m["YRmean"] - 5.0) < 1e-3
 
 
 def test_lateral_acceleration_projection():
@@ -89,16 +104,39 @@ def test_longitudinal_acceleration_projection():
 
 
 def test_mrld_uses_longitudinal_distance():
-    rows = [row(t, lead_long_m=10.0) for t in (0.0, 0.1, 0.2)]
+    rows = [row(t, lead_long_m=10.0, lead_lat_m=0.0) for t in (0.0, 0.1, 0.2)]
     m = compute_raw_metrics(rows, tor_ts=0.0)
     assert m["MRLD"] == 10.0
 
 
+def test_lead_metrics_ignore_other_lane_after_overtake():
+    # Lead directly ahead in-lane, then the ego changes lane and passes it.
+    # The longitudinal gap crosses zero, but that is a clean overtake, not a
+    # near-miss: the lead is now a lane to the side.
+    rows = [
+        row(0.0, lead_long_m=30.0, lead_lat_m=0.0, ttc=3.0, distance_m=30.0),
+        row(0.1, lead_long_m=10.0, lead_lat_m=0.0, ttc=1.0, distance_m=10.0),
+        row(0.2, lead_long_m=-5.0, lead_lat_m=-3.5, ttc=999.0, distance_m=6.1),
+    ]
+    m = compute_raw_metrics(rows, tor_ts=0.0)
+    assert m["MRLD"] == 10.0   # closest same-lane approach, not 0
+    assert m["TTC"] == 1.0
+    assert m["DTC"] == 10.0
+
+
+def test_lead_metrics_undefined_without_same_lane_lead():
+    # Lead never in the ego's lane -> no valid safety metrics (999 sentinel).
+    rows = [row(t, lead_long_m=10.0, lead_lat_m=-3.5) for t in (0.0, 0.1, 0.2)]
+    m = compute_raw_metrics(rows, tor_ts=0.0)
+    assert m["MRLD"] == 999.0
+    assert m["TTC"] == 999.0
+
+
 def test_dtc_is_distance_at_min_ttc():
     rows = [
-        row(0.0, ttc=5.0, lead_long_m=50.0),
-        row(0.1, ttc=1.0, lead_long_m=10.0),
-        row(0.2, ttc=3.0, lead_long_m=30.0),
+        row(0.0, ttc=5.0, lead_long_m=50.0, lead_lat_m=0.0),
+        row(0.1, ttc=1.0, lead_long_m=10.0, lead_lat_m=0.0),
+        row(0.2, ttc=3.0, lead_long_m=30.0, lead_lat_m=0.0),
     ]
     m = compute_raw_metrics(rows, tor_ts=0.0)
     assert m["TTC"] == 1.0
@@ -246,3 +284,33 @@ def test_legacy_rows_still_compute():
     assert m["Ymax"] >= 0.0
     assert m["LaVmean"] >= 0.0
     assert m["MRLD"] == 60.0  # falls back to Euclidean distance_m
+
+
+def _calibrated_standardizer() -> Standardizer:
+    st = Standardizer()
+    st.means = {k: 0.0 for k in ALL_METRICS}
+    st.stds = {k: 1.0 for k in ALL_METRICS}
+    st.calibrated = True
+    return st
+
+
+def test_undefined_metrics_do_not_contribute_to_pcs():
+    # TTC/DTC/MRLD use 999 as the "undefined" sentinel. Z-scoring it used to
+    # give z≈999, so PC3 (TTC 0.517 + DTC 0.497) exploded to ~1000.
+    st = _calibrated_standardizer()
+    metrics = {k: 0.0 for k in ALL_METRICS}
+    metrics["TTC"] = 999.0
+    metrics["DTC"] = 999.0
+    metrics["MRLD"] = 999.0
+    pcs = compute_pcs(metrics, st)
+    assert pcs["pc3"] == 0.0
+
+
+def test_defined_metrics_still_contribute_to_pcs():
+    st = _calibrated_standardizer()
+    metrics = {k: 0.0 for k in ALL_METRICS}
+    metrics["TTC"] = 1.0   # z = 1.0
+    metrics["DTC"] = 999.0  # undefined -> skipped
+    metrics["MRLD"] = 999.0  # undefined -> skipped
+    pcs = compute_pcs(metrics, st)
+    assert abs(pcs["pc3"] - 0.517) < 1e-6

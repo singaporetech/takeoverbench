@@ -34,6 +34,14 @@ THROTTLE_RT_THRESHOLD = 0.05   # accelerator more than 5%
 
 # Lane-change detection for TCLC / ECL (paper gives one-line definitions)
 LANE_CHANGE_CENTER_TOL_M = 0.3   # "centred in the new lane"
+# Fallback half-lane width (m) for the same-lane gate when lane_width_m is
+# unavailable; a standard highway lane is ~3.5 m.
+LANE_HALF_WIDTH_M = 1.75
+
+# Sentinel written for a metric that is undefined for this run (e.g. TTC with
+# no in-lane lead). Values at/above this must never be z-scored or they
+# dominate the PC scores.
+UNDEFINED_METRIC_MIN = 998.0
 # HFCS steering power band (Li et al. 2023, Table II)
 HFCS_BAND_HZ = (0.3, 0.6)
 
@@ -363,16 +371,34 @@ def compute_raw_metrics(rows: list[dict], tor_ts: float | None) -> dict:
     yaw_unwrapped = np.unwrap(np.radians(yaw_deg)) * (180.0 / np.pi)
     yaw_rel_deg = yaw_unwrapped - yaw_unwrapped[0] if n else np.zeros(n)
 
-    # Yaw rate (°/s): read the gyro when available, else difference yaw
+    # Yaw rate (°/s) — heading-derived rate is unambiguously °/s.
+    yaw_rate_from_yaw = np.zeros(n)
+    if n > 1:
+        yaw_diff = np.diff(yaw_deg)
+        yaw_diff = (yaw_diff + 180) % 360 - 180  # normalise to [-180, 180]
+        yaw_rate_from_yaw[1:] = yaw_diff / dt
+        yaw_rate_from_yaw[0] = yaw_rate_from_yaw[1]
+
+    # Prefer the gyro (much smoother derivative than differencing a rounded
+    # yaw), but its unit is build-dependent: CARLA documents rad/s, yet many
+    # builds report deg/s. Rather than assume, compare the gyro magnitude with
+    # the heading-derived rate (a factor of 180/π ≈ 57.3 apart) and normalise
+    # to °/s. Assuming the wrong unit here inflates every yaw metric ~57×.
     if ang_vel_z is not None:
-        yaw_rate_deg_s = np.degrees(ang_vel_z)
+        gyro = np.asarray(ang_vel_z, dtype=float)
+        ref = float(np.median(np.abs(yaw_rate_from_yaw)))
+        got = float(np.median(np.abs(gyro)))
+        if got > 1e-6 and ref > 1e-6:
+            ratio = got / ref
+            # ratio ≈ π/180 → gyro is rad/s; ratio ≈ 1 → already deg/s
+            if abs(ratio - np.pi / 180.0) < abs(ratio - 1.0):
+                yaw_rate_deg_s = gyro * (180.0 / np.pi)
+            else:
+                yaw_rate_deg_s = gyro
+        else:
+            yaw_rate_deg_s = gyro
     else:
-        yaw_rate_deg_s = np.zeros(n)
-        if n > 1:
-            yaw_diff = np.diff(yaw_deg)
-            yaw_diff = (yaw_diff + 180) % 360 - 180  # normalise to [-180, 180]
-            yaw_rate_deg_s[1:] = yaw_diff / dt
-            yaw_rate_deg_s[0] = yaw_rate_deg_s[1]
+        yaw_rate_deg_s = yaw_rate_from_yaw
 
     # Yaw acceleration (°/s²) — derivative of the yaw rate
     yaw_accel_deg_s2 = np.zeros(n)
@@ -525,9 +551,34 @@ def compute_raw_metrics(rows: list[dict], tor_ts: float | None) -> dict:
     m["LoAmean"] = round(float(np.mean(np.abs(acc_fwd))), 3)
     m["LoASD"] = round(float(np.std(acc_fwd)), 3)
 
+    # ── Same-lane gate for the lead-vehicle safety metrics ──
+    # MRLD/TTC/DTC are only meaningful while the obstacle is in the ego's lane
+    # AND ahead. Once the driver changes lane to pass it, the longitudinal gap
+    # crosses zero; without this gate that reads as a phantom near-miss
+    # (MRLD≈0, TTC≈0) on a perfectly clean overtake.
+    lead_lat = _optional_array(post_tor, "lead_lat_m")
+    lane_w_arr = _optional_array(post_tor, "lane_width_m")
+    same_lane = None
+    if lead_long is not None and lead_lat is not None:
+        if lane_w_arr is not None:
+            half_lane = np.where(
+                np.abs(lane_w_arr) < 900.0,
+                np.abs(lane_w_arr) * 0.5,
+                LANE_HALF_WIDTH_M,
+            )
+        else:
+            half_lane = np.full(n, LANE_HALF_WIDTH_M)
+        same_lane = (np.abs(lead_lat) <= half_lane) & (lead_long > 0)
+
     # 33. Minimum relative longitudinal distance to the lead vehicle
     if lead_long is not None:
-        m["MRLD"] = round(float(np.min(np.abs(lead_long))), 3)
+        if same_lane is None:
+            # Legacy CSV without lateral info: fall back to the raw minimum.
+            m["MRLD"] = round(float(np.min(np.abs(lead_long))), 3)
+        elif np.any(same_lane):
+            m["MRLD"] = round(float(np.min(lead_long[same_lane])), 3)
+        else:
+            m["MRLD"] = 999.0  # no same-lane lead ahead after the TOR
     else:
         m["MRLD"] = round(float(np.min(dist_m)), 3)
 
@@ -543,15 +594,17 @@ def compute_raw_metrics(rows: list[dict], tor_ts: float | None) -> dict:
             if total_power > 0:
                 m["HFCS"] = round(float(power[band].sum()) / total_power, 4)
 
-    # 35. TTC (min after TOR)
+    # 35. TTC (min after TOR, same-lane lead ahead only)
     valid_mask = ttc_vals < 998
+    if same_lane is not None:
+        valid_mask = valid_mask & same_lane
     valid_ttc = ttc_vals[valid_mask]
     if len(valid_ttc) > 0:
         m["TTC"] = round(float(np.min(valid_ttc)), 3)
         # 36. DTC — distance to the lead at the minimum-TTC sample
         idx = int(np.argmin(np.where(valid_mask, ttc_vals, np.inf)))
         if lead_long is not None:
-            m["DTC"] = round(float(np.abs(lead_long[idx])), 3)
+            m["DTC"] = round(float(lead_long[idx]), 3)
         else:
             m["DTC"] = round(float(dist_m[idx]), 3)
     else:
@@ -599,10 +652,25 @@ def compute_pcs(raw_metrics: dict, standardizer: Standardizer | None = None) -> 
         metrics = raw_metrics
         logger.warning("No calibration — using raw values. Scores may be unreliable.")
 
+    # A metric that is undefined for this run (999 sentinel, e.g. TTC with no
+    # in-lane lead) must not contribute. Z-scoring the sentinel produces
+    # astronomically large scores (z ≈ 10³–10⁴) that swamp every other term.
+    undefined = {
+        name
+        for name, value in raw_metrics.items()
+        if value is None or float(value) >= UNDEFINED_METRIC_MIN
+    }
+    if undefined:
+        logger.warning(
+            "Undefined metrics excluded from PC scores: %s", sorted(undefined)
+        )
+
     pcs = {}
     for i, weights in enumerate(PC_WEIGHTS, 1):
         total = 0.0
         for name, weight in weights.items():
+            if name in undefined:
+                continue
             total += weight * metrics.get(name, 0.0)
         pcs[f"pc{i}"] = round(total, 6)
 
