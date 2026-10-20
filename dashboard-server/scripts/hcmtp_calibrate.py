@@ -64,6 +64,43 @@ def _to_float(value):
         return None
 
 
+# Columns that are identifiers, not numbers — leave them as strings.
+_STR_COLUMNS = {"preset_id", "run_id", "session_id", "hardware", "mode", "scenario"}
+
+_recompute_fn = None
+
+
+def _parse_rows(rows: list[dict]) -> list[dict]:
+    """Convert CSV string values to floats so sim.hcmtp can consume them."""
+    out = []
+    for r in rows:
+        out.append({
+            k: (v if k in _STR_COLUMNS else _to_float(v))
+            for k, v in r.items()
+        })
+    return out
+
+
+def _get_recompute_fn(project_root: Path):
+    """Import sim.hcmtp.compute_raw_metrics with a stubbed carla module.
+
+    Recomputing from the raw telemetry keeps the baseline consistent with the
+    *current* metric definitions, regardless of which code version recorded
+    the run. Requires numpy (already a server dependency).
+    """
+    global _recompute_fn
+    if _recompute_fn is None:
+        import sys as _sys
+        from unittest.mock import MagicMock
+
+        _sys.modules.setdefault("carla", MagicMock(name="carla"))
+        if str(project_root) not in _sys.path:
+            _sys.path.insert(0, str(project_root))
+        from sim.hcmtp import compute_raw_metrics  # noqa: PLC0415
+        _recompute_fn = compute_raw_metrics
+    return _recompute_fn
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Compute HCMTP population µ/σ per preset")
     parser.add_argument("--runs-dir", default="runs", help="Directory of telemetry CSVs (default: runs/)")
@@ -75,6 +112,12 @@ def main() -> None:
     parser.add_argument(
         "--keep-collisions", action="store_true",
         help="Include runs flagged as collisions (default: exclude them)",
+    )
+    parser.add_argument(
+        "--recompute", action="store_true",
+        help="Recompute the 41 metrics from the raw telemetry with the current "
+             "code instead of reading the stored columns. Use this whenever the "
+             "metric definitions have changed since the runs were recorded.",
     )
     parser.add_argument("--output", default=None, help="Output path (default: <project>/calibration.json)")
     args = parser.parse_args()
@@ -116,15 +159,26 @@ def main() -> None:
             print(f"  Skipping {path.name}: no valid preset_id")
             continue
 
-        last = rows[-1]
-        metrics: dict[str, float] = {}
-        for k in ALL_METRICS:
-            v = _to_float(last.get(k))
-            if v is not None:
-                metrics[k] = v
-        if not metrics:
-            print(f"  Skipping {path.name}: no HCMTP metric columns")
-            continue
+        if args.recompute:
+            parsed = _parse_rows(rows)
+            tor_ts = next(
+                (r.get("timestamp") for r in parsed if r.get("post_tor")), None
+            )
+            try:
+                metrics = _get_recompute_fn(project_root)(parsed, tor_ts)
+            except Exception as e:
+                print(f"  Skipping {path.name}: recompute failed ({e})")
+                continue
+        else:
+            last = rows[-1]
+            metrics = {}
+            for k in ALL_METRICS:
+                v = _to_float(last.get(k))
+                if v is not None:
+                    metrics[k] = v
+            if not metrics:
+                print(f"  Skipping {path.name}: no HCMTP metric columns")
+                continue
 
         by_preset[preset_id].append(metrics)
         sources[preset_id].add(path.parent.name)
@@ -165,6 +219,7 @@ def main() -> None:
         "excluded_substrings": args.exclude,
         "min_rows": args.min_rows,
         "keep_collisions": args.keep_collisions,
+        "recomputed": args.recompute,
         "csv_files_used": len(kept),
         "sigma_floor": MIN_SIGMA,
     }
