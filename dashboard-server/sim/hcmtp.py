@@ -15,6 +15,7 @@ from pathlib import Path
 import carla
 import numpy as np
 
+from .constants import LANE_HALF_WIDTH_M
 from .state import ctx
 
 logger = logging.getLogger(__name__)
@@ -34,9 +35,6 @@ THROTTLE_RT_THRESHOLD = 0.05   # accelerator more than 5%
 
 # Lane-change detection for TCLC / ECL (paper gives one-line definitions)
 LANE_CHANGE_CENTER_TOL_M = 0.3   # "centred in the new lane"
-# Fallback half-lane width (m) for the same-lane gate when lane_width_m is
-# unavailable; a standard highway lane is ~3.5 m.
-LANE_HALF_WIDTH_M = 1.75
 
 # Sentinel written for a metric that is undefined for this run (e.g. TTC with
 # no in-lane lead). Values at/above this must never be z-scored or they
@@ -556,10 +554,40 @@ def compute_raw_metrics(rows: list[dict], tor_ts: float | None) -> dict:
     # AND ahead. Once the driver changes lane to pass it, the longitudinal gap
     # crosses zero; without this gate that reads as a phantom near-miss
     # (MRLD≈0, TTC≈0) on a perfectly clean overtake.
+    #
+    # Primary test: the obstacle is in the ego's own lane/road. Lane identity
+    # is curvature-proof, unlike the body-frame lateral offset (a same-lane car
+    # a few hundred metres ahead around a bend reads as tens of metres "to the
+    # side"). Caveat: CARLA's project_to_road() flips between overlapping road
+    # segments on Town06, so the ego's projected lane_id is not perfectly
+    # stable — it is still far better than a fixed lateral tolerance, which
+    # leaves the curved preset undefined entirely.
+    lead_lane_ids = _optional_array(post_tor, "lead_lane_id")
+    lead_road_ids = _optional_array(post_tor, "lead_road_id")
+    ego_road_ids = _optional_array(post_tor, "road_id")
     lead_lat = _optional_array(post_tor, "lead_lat_m")
     lane_w_arr = _optional_array(post_tor, "lane_width_m")
+
+    # A lane pair is "known" when neither id is the -1 lookup-failure sentinel.
+    lane_known = None
+    lane_match = None
+    if lead_lane_ids is not None and lane_ids is not None:
+        lane_known = (lead_lane_ids != -1) & (lane_ids != -1)
+        lane_match = lead_lane_ids == lane_ids
+        if lead_road_ids is not None and ego_road_ids is not None:
+            lane_known = lane_known & (lead_road_ids != -1) & (ego_road_ids != -1)
+            lane_match = lane_match & (lead_road_ids == ego_road_ids)
+
     same_lane = None
-    if lead_long is not None and lead_lat is not None:
+    if (
+        lead_long is not None
+        and lane_known is not None
+        and bool(np.any(lane_known))
+    ):
+        same_lane = lane_match & lane_known & (lead_long > 0)
+    elif lead_long is not None and lead_lat is not None:
+        # Fallback: no lane identity available (legacy CSV, or every lookup
+        # failed) -> use the body-frame lateral offset.
         if lane_w_arr is not None:
             half_lane = np.where(
                 np.abs(lane_w_arr) < 900.0,

@@ -179,6 +179,12 @@ def telemetry_loop() -> None:
                 dist_m = 999.0
                 lead_long_m = 999.0
                 lead_lat_m = 999.0
+                # The lead's own lane identity. Body-frame lateral offset is
+                # useless on a curve (a same-lane car hundreds of metres ahead
+                # reads as tens of metres "to the side"), so lane metrics are
+                # gated on matching lane/road instead.
+                lead_lane_id = -1
+                lead_road_id = -1
                 if ctx["lead_vehicle"]:
                     lead_loc = ctx["lead_vehicle"].get_location()
                     dist_m = loc.distance(lead_loc)
@@ -188,6 +194,19 @@ def telemetry_loop() -> None:
                     cos_y, sin_y = math.cos(yaw_rad), math.sin(yaw_rad)
                     lead_long_m = rel_x * cos_y + rel_y * sin_y
                     lead_lat_m = -rel_x * sin_y + rel_y * cos_y
+                    if ctx["world"] is not None:
+                        try:
+                            lead_wp = ctx["world"].get_map().get_waypoint(
+                                lead_loc, project_to_road=True,
+                                lane_type=carla.LaneType.Driving,
+                            )
+                            if lead_wp is not None:
+                                lead_lane_id = int(lead_wp.lane_id)
+                                lead_road_id = int(lead_wp.road_id)
+                        except Exception:
+                            logger.debug(
+                                "Lead lane lookup failed", exc_info=True
+                            )
 
                 # Lane geometry, stored so lane metrics are reproducible offline.
                 lane_id = -1
@@ -241,6 +260,9 @@ def telemetry_loop() -> None:
                     "ang_vel_z": round(ang_vel.z, 4),
                     "lead_long_m": round(lead_long_m, 2),
                     "lead_lat_m": round(lead_lat_m, 2),
+                    # ── Lead lane identity (for curvature-proof lane gating) ──
+                    "lead_lane_id": lead_lane_id,
+                    "lead_road_id": lead_road_id,
                     "lane_id": lane_id,
                     "road_id": road_id,
                     "lane_width_m": lane_width_m,

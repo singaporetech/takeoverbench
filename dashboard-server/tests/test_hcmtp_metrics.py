@@ -314,3 +314,48 @@ def test_defined_metrics_still_contribute_to_pcs():
     metrics["MRLD"] = 999.0  # undefined -> skipped
     pcs = compute_pcs(metrics, st)
     assert abs(pcs["pc3"] - 0.517) < 1e-6
+
+
+def test_lane_identity_wins_over_body_offset():
+    # Same lane_id/road_id but a large body-frame lateral offset — exactly what
+    # a car in your own lane looks like a few hundred metres ahead around a
+    # bend. It must still count as an in-lane lead.
+    rows = [
+        row(0.0, lead_long_m=200.0, lead_lat_m=-40.0, ttc=8.0,
+            lead_lane_id=-5, lead_road_id=2, lane_id=-5, road_id=2),
+        row(0.1, lead_long_m=100.0, lead_lat_m=-20.0, ttc=4.0,
+            lead_lane_id=-5, lead_road_id=2, lane_id=-5, road_id=2),
+    ]
+    m = compute_raw_metrics(rows, tor_ts=0.0)
+    assert m["MRLD"] == 100.0
+    assert m["TTC"] == 4.0
+
+
+def test_other_lane_excluded_even_when_directly_ahead():
+    # Lead dead ahead (small lateral offset) but projected into a different
+    # lane -> not a hazard for the ego's lane.
+    rows = [
+        row(0.0, lead_long_m=10.0, lead_lat_m=0.0, ttc=1.0,
+            lead_lane_id=-4, lead_road_id=2, lane_id=-5, road_id=2),
+    ]
+    m = compute_raw_metrics(rows, tor_ts=0.0)
+    assert m["MRLD"] == 999.0
+    assert m["TTC"] == 999.0
+
+
+def test_unknown_lane_falls_back_to_body_offset():
+    # lead_lane_id -1 (lookup failed) must not match; the lateral offset then
+    # decides, so a lead dead ahead still counts.
+    rows = [
+        row(0.0, lead_long_m=10.0, lead_lat_m=0.0, ttc=1.0,
+            lead_lane_id=-1, lead_road_id=-1, lane_id=-5, road_id=2),
+    ]
+    m = compute_raw_metrics(rows, tor_ts=0.0)
+    assert m["MRLD"] == 10.0
+
+
+def test_legacy_without_lead_lane_uses_body_offset():
+    # Runs recorded before lead_lane_id existed have no such column at all.
+    rows = [row(t, lead_long_m=10.0, lead_lat_m=0.0, ttc=1.0) for t in (0.0, 0.1)]
+    m = compute_raw_metrics(rows, tor_ts=0.0)
+    assert m["MRLD"] == 10.0

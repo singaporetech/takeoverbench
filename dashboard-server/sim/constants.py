@@ -45,6 +45,11 @@ STOP_TIMEOUT_S = 4.0
 # A sample is flagged as a collision when horizontal acceleration exceeds this.
 # Normal driving/braking is well under 10 m/s^2; collision spikes are >100.
 COLLISION_ACCEL_THRESHOLD_MS = 30.0
+
+# Half a standard highway lane (m). Fallback tolerance for the metric layer's
+# "is the obstacle in the ego's lane?" test when the live lane width is
+# unavailable and lane identity cannot be used.
+LANE_HALF_WIDTH_M = 1.75
 TELEMETRY_INTERVAL_S = 0.033  # ~30 Hz
 CONTROLLER_INTERVAL_S = 0.033 # ~30 Hz
 SPAWN_RETRY_COUNT = 20

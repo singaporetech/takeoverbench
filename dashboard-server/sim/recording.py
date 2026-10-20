@@ -110,6 +110,7 @@ def stop_recording_and_save() -> tuple | None:
                   "acc_x", "acc_y", "acc_z",
                   "ang_vel_x", "ang_vel_y", "ang_vel_z",
                   "lead_long_m", "lead_lat_m",
+                  "lead_lane_id", "lead_road_id",
                   "lane_id", "road_id", "lane_width_m", "lane_offset_signed_m",
                   "collision", "post_tor"]
 
